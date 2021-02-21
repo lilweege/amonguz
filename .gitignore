@@ -1,3 +1,4 @@
 /asio-1.18.1
-/server
-/client
+/server/*.exe
+/server/*.out
+/client/*.exe
