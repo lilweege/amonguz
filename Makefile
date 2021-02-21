@@ -39,7 +39,7 @@ COMMON_DEPEND = \
 	common.h
 CLIENT_DEPEND = $(COMMON_DEPEND) \
 	olcPixelGameEngine.h \
-	amonguz_client.res \
+	client.res \
 	client.cpp
 SERVER_DEPEND = $(COMMON_DEPEND) \
 	server.cpp
@@ -48,16 +48,16 @@ SERVER_DEPEND = $(COMMON_DEPEND) \
 
 
 
-all: server amonguz_client.res client
+all: server client.res client
 
-amonguz_client.res: amonguz_client.rc amonguz.ico
-	windres amonguz_client.rc -O coff -o amonguz_client.res
+client.res: client.rc amonguz.ico
+	windres client.rc -O coff -o client.res
 
 client: $(CLIENT_DEPEND)
-	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp amonguz_client.res $(CLIENT_LIBS)
+	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp client.res $(CLIENT_LIBS)
 
 release: $(CLIENT_DEPEND)
-	$(CC) $(CFLAGS_OPTIMIZED) -o $(CLIENT_TARGET) client.cpp amonguz_client.res $(CLIENT_LIBS)
+	$(CC) $(CFLAGS_OPTIMIZED) -o $(CLIENT_TARGET) client.cpp client.res $(CLIENT_LIBS)
 
 server: $(SERVER_DEPEND)
 	$(CC) $(CFLAGS_DEBUGGING) -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
