@@ -31,19 +31,19 @@ protected:
 		if (!client)
 			return;
 			
-		auto id = client->GetID();
+		uint32_t id = client->GetID();
 		if (players.find(id) == players.end())
 			return;
 		
-		auto& desc = players[id];
-		std::cout << "[UNGRACEFUL REMOVAL]:" + std::to_string(desc.nUniqueID) + "\n";
+		Player& player = players[id];
+		std::cout << "[UNGRACEFUL REMOVAL]:" + std::to_string(player.uid) + "\n";
 		players.erase(id);
 		deadIDs.push_back(id);
 	}
 
 	void OnMessage(std::shared_ptr<olc::net::connection<GameMsg>> client, olc::net::message<GameMsg>& msg) override {
 		while (!deadIDs.empty()) {
-			auto deadID = deadIDs.back();
+			uint32_t deadID = deadIDs.back();
 			olc::net::message<GameMsg> m;
 			m.header.id = GameMsg::Game_RemovePlayer;
 			m << deadID;
@@ -54,19 +54,19 @@ protected:
 		
 		switch (msg.header.id) {
 		case GameMsg::Client_RegisterWithServer: {
-			Player desc;
-			msg >> desc;
-			desc.nUniqueID = client->GetID();
-			players.insert_or_assign(desc.nUniqueID, desc);
+			Player player;
+			msg >> player;
+			player.uid = client->GetID();
+			players.insert_or_assign(player.uid, player);
 
 			olc::net::message<GameMsg> msgSendID;
 			msgSendID.header.id = GameMsg::Client_AssignID;
-			msgSendID << desc.nUniqueID;
+			msgSendID << player.uid;
 			MessageClient(client, msgSendID);
 
 			olc::net::message<GameMsg> msgAddPlayer;
 			msgAddPlayer.header.id = GameMsg::Game_AddPlayer;
-			msgAddPlayer << desc;
+			msgAddPlayer << player;
 			MessageAllClients(msgAddPlayer);
 
 			for (const auto& [id, player] : players) {
@@ -75,9 +75,6 @@ protected:
 				msgAddOtherPlayers << player;
 				MessageClient(client, msgAddOtherPlayers);
 			}
-			break;
-		}
-		case GameMsg::Client_UnregisterWithServer: {
 			break;
 		}
 		case GameMsg::Game_UpdatePlayer: {
@@ -92,9 +89,13 @@ protected:
 
 int main() {
 	int SERVER_PORT;
+#ifdef DEBUG
+	SERVER_PORT = 42000;
+#else
 	std::cout << "Enter port number to host: ";
 	std::cin >> SERVER_PORT;
-	
+#endif
+
 	AmonguzServer server(SERVER_PORT);
 	
 	while (true)

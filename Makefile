@@ -43,9 +43,6 @@ CLIENT_DEPEND = $(COMMON_DEPEND) \
 	client.cpp
 SERVER_DEPEND = $(COMMON_DEPEND) \
 	server.cpp
-	
-
-
 
 
 all: server client.res client
@@ -53,11 +50,17 @@ all: server client.res client
 client.res: client.rc amonguz.ico
 	windres client.rc -O coff -o client.res
 
-client: $(CLIENT_DEPEND)
-	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp client.res $(CLIENT_LIBS)
-
 release: $(CLIENT_DEPEND)
 	$(CC) $(CFLAGS_OPTIMIZED) -o $(CLIENT_TARGET) client.cpp client.res $(CLIENT_LIBS)
 
+client: $(CLIENT_DEPEND)
+	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp $(CLIENT_LIBS)
+
 server: $(SERVER_DEPEND)
 	$(CC) $(CFLAGS_DEBUGGING) -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
+
+flag_debug:
+	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
+	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(CLIENT_TARGET) client.cpp $(CLIENT_LIBS)
+
+# yeah I am bad at make

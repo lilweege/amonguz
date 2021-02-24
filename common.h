@@ -20,9 +20,11 @@ enum class GameMsg : uint32_t {
 };
 
 struct Player {
-	uint32_t nUniqueID = 0;
+	uint32_t uid = 0;
+	char name[10];
 
-	float fRadius = 0.5f;
-	float fPosX = 0, fPosY = 0;
-	float fVelX = 0, fVelY = 0;
+	uint8_t rCol = 255, gCol = 255, bCol = 255;
+	float posX = 0, posY = 0;
+	float velX = 0, velY = 0;
+	float walkCycle = 0;
 };
