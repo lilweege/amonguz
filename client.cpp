@@ -46,7 +46,16 @@ private:
 	olc::vi2d sheetSize;
 	olc::vi2d cellSize;
 
+	int scale;
 	Game game;
+	
+	olc::Pixel
+		darkColor = olc::VERY_DARK_CYAN,
+		lightColor = olc::WHITE,
+		hoverColor = olc::YELLOW,
+		validColor = { 0, 255, 0, 128 };
+		// invalidColor = { 255, 0, 0, 128 };
+	
 	// constant for all players
 	// TODO: store these somewhere elses
 	// const int worldScale = 100;
@@ -149,35 +158,65 @@ private:
 		Send(msg);
 	}
 	
-	void redraw() {
-		Clear(olc::BLACK);
-		
-		int scale = std::min(ScreenWidth(), ScreenHeight()) / 8;
 
+	olc::vi2d selectedCellPos;
+	Cell selectedCell;
+
+	void fillCell(olc::vi2d cellPos, olc::Pixel color) {
+		FillRect(cellPos * scale, { scale, scale }, color);
+	}
+
+	void drawPiece(int x, int y, Cell cell) {
+		// assert(cell != Empty);
+		int piece = cellPiece(cell);
+		int color = cellColor(cell);
+		DrawPartialDecal(
+			{ float(x), float(y) },
+			{ float(scale), float(scale) },
+			atlasDecal,
+			{ float(piece * cellSize.x), float(color * cellSize.y) },
+			cellSize
+		);
+	}
+
+	void redraw() {
+		Clear(darkColor);
+		
 		for (int i = 0; i < 8; ++i)
 			for (int j = 0; j < 8; ++j) {
 				if (((i + j) & 1) == 0)
-					FillRect(i * scale, j * scale, scale, scale);
+					FillRect(i * scale, j * scale, scale, scale, lightColor);
+					
 				Cell cell = game.getCell(i, j);
 				if (cell == Empty)
 					continue;
-				int cellType = (cell & 0b0111) - 1;
-				bool isBlack = (cell & 0b1000);
-				DrawPartialDecal(
-					{i * scale, j * scale},
-					{scale, scale},
-					atlasDecal,
-					olc::vf2d{float(cellType * cellSize.x), float(isBlack * cellSize.y)},
-					cellSize
-				);
+				drawPiece(i * scale, j * scale, cell);
 			}
 		
-		olc::vi2d mousePos{ GetMouseX(), GetMouseY() };
-		olc::vi2d cellPos{ mousePos.x / scale, mousePos.y / scale };
-		FillRect(cellPos * scale, {scale, scale}, olc::GREEN);
 
-		// TODO: mouse dragging
+		olc::vi2d mousePos = GetMousePos();
+		olc::vi2d currentCellPos{ mousePos.x / scale, mousePos.y / scale };
+		fillCell(currentCellPos, hoverColor);
 
+		if (GetMouse(0).bPressed) {
+			selectedCellPos = currentCellPos;
+			selectedCell = game.getCell(currentCellPos);
+			game.setCell(currentCellPos, Empty);
+		}
+		if (selectedCell != Empty) {
+			drawPiece(mousePos.x - scale / 2, mousePos.y - scale / 2, selectedCell);
+
+			if (GetMouse(0).bReleased) {
+				game.setCell(currentCellPos, selectedCell);
+				selectedCell = Empty;
+			}
+		}
+
+		SetPixelMode(olc::Pixel::ALPHA);
+		for (olc::vi2d validCellPos : game.getLegalMoves(currentCellPos)) {
+			fillCell(validCellPos, validColor);
+		}
+		SetPixelMode(olc::Pixel::NORMAL);
 
 
 		// for (const auto& [id, player]: players) {
@@ -217,7 +256,7 @@ public:
 		atlasDecal = new olc::Decal(atlasSprite);
 		sheetSize = { 6, 2 };
 		cellSize = { atlasSprite->width / sheetSize.x, atlasSprite->height / sheetSize.y };
-
+		scale = ScreenWidth() / 8;
 
 		return true;
 	}

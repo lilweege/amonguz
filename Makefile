@@ -53,16 +53,16 @@ client.res: client.rc amonguz.ico
 	windres client.rc -O coff -o client.res
 
 release: $(CLIENT_DEPEND)
-	$(CC) $(CFLAGS_OPTIMIZED) -o $(CLIENT_TARGET) client.cpp client.res $(CLIENT_LIBS)
+	$(CC) $(CFLAGS_OPTIMIZED) -o $(CLIENT_TARGET) client.cpp game.cpp client.res $(CLIENT_LIBS)
 
 client: $(CLIENT_DEPEND)
-	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp $(CLIENT_LIBS)
+	$(CC) $(CFLAGS_DEBUGGING) -o $(CLIENT_TARGET) client.cpp game.cpp $(CLIENT_LIBS)
 
 server: $(SERVER_DEPEND)
 	$(CC) $(CFLAGS_DEBUGGING) -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
 
 flag_debug:
 #	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
-	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(CLIENT_TARGET) client.cpp $(CLIENT_LIBS)
+	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(CLIENT_TARGET) client.cpp game.cpp $(CLIENT_LIBS)
 
 # yeah I am bad at make
