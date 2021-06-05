@@ -1,6 +1,5 @@
 #include "common.h"
 
-#include <iostream>
 #include <unordered_map>
 
 
@@ -87,16 +86,8 @@ protected:
 };
 
 
-int main() {
-	int SERVER_PORT;
-#ifdef DEBUG
-	SERVER_PORT = 42000;
-#else
-	std::cout << "Enter port number to host: ";
-	std::cin >> SERVER_PORT;
-#endif
-
-	AmonguzServer server(SERVER_PORT);
+int main(int argc, char *argv[]) {
+	AmonguzServer server((argc >= 2) ? atoi(argv[1]) : 42000);
 	
 	while (true)
 		server.Update(-1, true);

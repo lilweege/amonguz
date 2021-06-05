@@ -4,7 +4,7 @@ COMMON_FLAGS = -static -std=c++17
 CFLAGS_OPTIMIZED = -Ofast -Os -fdata-sections -ffunction-sections $(COMMON_FLAGS)
 CFLAGS_DEBUGGING = -g $(COMMON_FLAGS)
 
-ASIO = -Iasio-1.18.1/include
+ASIO = -Iasio-1.18.2/include
 ASIO_WINDOWS = $(ASIO) -lws2_32 -lmswsock
 ASIO_LINUX = $(ASIO) -pthread
 
@@ -40,7 +40,9 @@ COMMON_DEPEND = \
 CLIENT_DEPEND = $(COMMON_DEPEND) \
 	olcPixelGameEngine.h \
 	client.res \
-	client.cpp
+	client.cpp \
+	game.h \
+	game.cpp
 SERVER_DEPEND = $(COMMON_DEPEND) \
 	server.cpp
 
@@ -60,7 +62,7 @@ server: $(SERVER_DEPEND)
 	$(CC) $(CFLAGS_DEBUGGING) -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
 
 flag_debug:
-	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
+#	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(SERVER_TARGET) server.cpp $(SERVER_LIBS)
 	$(CC) $(CFLAGS_DEBUGGING) -D DEBUG -o $(CLIENT_TARGET) client.cpp $(CLIENT_LIBS)
 
 # yeah I am bad at make
