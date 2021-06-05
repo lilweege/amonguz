@@ -44,16 +44,16 @@ bool Game::isValidMove(Move move) {
         return false;
 
 
-    return false;
+    // return false;
     return true;
 }
 
-// FIXME: this is trash
-std::vector<olc::vi2d> Game::getLegalMoves(int i, int j) {
-    std::vector<olc::vi2d> ret;
+unsigned long long Game::getLegalMoves(int i, int j) {
+    unsigned long long board = 0LL;
+    // FIXME: this is trash
     for (int x = 0; x < 8; ++x)
         for (int y = 0; y < 8; ++y)
             if (isValidMove({{i, j}, {x, y}}))
-                ret.emplace_back(x, y);
-    return ret;
+                board |= (1 << (x * 8 + y));
+    return board;
 }

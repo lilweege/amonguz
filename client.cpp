@@ -213,9 +213,13 @@ private:
 		}
 
 		SetPixelMode(olc::Pixel::ALPHA);
-		for (olc::vi2d validCellPos : game.getLegalMoves(currentCellPos)) {
-			fillCell(validCellPos, validColor);
-		}
+		unsigned long long validMoves = game.getLegalMoves(currentCellPos);
+		for (int i = 0; i < 8; ++i)
+			for (int j = 0; j < 8; ++j) {
+				bool isValid = (validMoves >> (i * 8 + j)) & 1;
+				if (isValid)
+					fillCell({i, j}, validColor);
+			}
 		SetPixelMode(olc::Pixel::NORMAL);
 
 

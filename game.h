@@ -51,9 +51,9 @@ private:
 
 public:
 	// bool tryMove(Move move);
-	// TODO: perhaps use a different container
-	std::vector<olc::vi2d> getLegalMoves(int i, int j);
-	std::vector<olc::vi2d> getLegalMoves(olc::vi2d pos) { return getLegalMoves(pos.x, pos.y); }
+	
+	unsigned long long getLegalMoves(int i, int j);
+	unsigned long long getLegalMoves(olc::vi2d pos) { return getLegalMoves(pos.x, pos.y); }
 
 
 	Game() {
