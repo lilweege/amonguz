@@ -160,7 +160,7 @@ private:
 	
 
 	olc::vi2d selectedCellPos;
-	Cell selectedCell;
+	Cell selectedCell = Empty;
 
 	void fillCell(olc::vi2d cellPos, olc::Pixel color) {
 		FillRect(cellPos * scale, { scale, scale }, color);
@@ -187,33 +187,30 @@ private:
 				if (((i + j) & 1) == 0)
 					FillRect(i * scale, j * scale, scale, scale, lightColor);
 					
+				
+				if (selectedCell != Empty && i == selectedCellPos.x && j == selectedCellPos.y)
+					continue;
 				Cell cell = game.getCell(i, j);
 				if (cell == Empty)
 					continue;
 				drawPiece(i * scale, j * scale, cell);
 			}
 		
-
+		// TODO: move some of this stuff to another function
 		olc::vi2d mousePos = GetMousePos();
 		olc::vi2d currentCellPos{ mousePos.x / scale, mousePos.y / scale };
 		fillCell(currentCellPos, hoverColor);
 
 		if (GetMouse(0).bPressed) {
-			selectedCellPos = currentCellPos;
-			selectedCell = game.getCell(currentCellPos);
-			game.setCell(currentCellPos, Empty);
-		}
-		if (selectedCell != Empty) {
-			drawPiece(mousePos.x - scale / 2, mousePos.y - scale / 2, selectedCell);
-
-			if (GetMouse(0).bReleased) {
-				game.setCell(currentCellPos, selectedCell);
-				selectedCell = Empty;
+			Cell target = game.getCell(currentCellPos);
+			if (target != Empty) {
+				selectedCellPos = currentCellPos;
+				selectedCell = target;
 			}
 		}
-
+		
+		unsigned long long validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
 		SetPixelMode(olc::Pixel::ALPHA);
-		unsigned long long validMoves = game.getLegalMoves(currentCellPos);
 		for (int i = 0; i < 8; ++i)
 			for (int j = 0; j < 8; ++j) {
 				bool isValid = (validMoves >> (i * 8 + j)) & 1;
@@ -221,7 +218,22 @@ private:
 					fillCell({i, j}, validColor);
 			}
 		SetPixelMode(olc::Pixel::NORMAL);
-
+		if (selectedCell != Empty) {
+			drawPiece(mousePos.x - scale / 2, mousePos.y - scale / 2, selectedCell);
+			if (GetMouse(0).bReleased) {
+				bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
+				if (isLegal) {
+					game.setCell(currentCellPos, selectedCell);
+					game.setCell(selectedCellPos, Empty);
+					// more logic here unless refactor
+				}
+				else {
+					game.setCell(selectedCellPos, selectedCell);
+				}
+				selectedCell = Empty;
+			}
+		}
+		
 
 		// for (const auto& [id, player]: players) {
 		// 	olc::vf2d pos = { player.posX, player.posY }; pos *= worldScale;
