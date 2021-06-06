@@ -1,6 +1,9 @@
 #include "game.h"
 
 
+// TODO: read state from FEN code
+// void Game::fromFEN() {}
+
 void Game::initBoard() {
 	board[0][0] = BlackRook;		board[0][7] = WhiteRook;
 	board[1][0] = BlackKnight;		board[1][7] = WhiteKnight;
@@ -18,34 +21,22 @@ void Game::initBoard() {
 	}
 }
 
+void Game::performMove(olc::vi2d fr, olc::vi2d to) {
+	board[to.x][to.y] = board[fr.x][fr.y];
+	board[fr.x][fr.y] = Empty;
+	// en passant
+	if (board[to.x][to.y] == BlackPawn && board[to.x][to.y - 1] == WhitePawn)
+		board[to.x][to.y - 1] = Empty;
+	else if (board[to.x][to.y] == WhitePawn && board[to.x][to.y + 1] == BlackPawn)
+		board[to.x][to.y + 1] = Empty;
 
-// bool Game::tryMove(Move move) {
-//     bool isValid = isValidMove(move);
-//     if (isValid)
-//         performMove(move);
-//     return isValid;
-// }
-
-// void Game::performMove(Move move) {
-//     std::swap(board[move.fr.x][move.fr.y], board[move.to.x][move.to.y]);
-//     board[move.fr.x][move.fr.y] = Empty;
-
-//     // updating other stuff
-
-//     playerTurn = (playerTurn == White) ? Black : White;
-// }
+	// TODO: pawn promotion
+	
 
 
-bool Game::isValidMove(Move move) {
-	int i = move.fr.x, j = move.fr.y;
-	Cell piece = getCell(i, j);
-	if (move.fr.x == move.to.x &&
-		move.fr.y == move.to.y)
-		return false;
-
-
-	// return false;
-	return true;
+	// TODO: online stuff
+	lastMove = fr;
+	playerTurn = (playerTurn == White) ? Black : White;
 }
 
 // TODO: refactor
@@ -61,15 +52,20 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 
 	Cell piece = getCell(i, j);
 	// assert(piece != Empty);
+	if (cellColor(piece) != playerTurn)
+		return moves;
+	
+	// a pawn should never exist on the first or last rank
 	if (piece == BlackPawn) {
-		// a pawn should never exist on the first or last rank
-		// TODO: en passant
+		// normal move
 		if (getCell(i, j + 1) == Empty) {
 			validateMove(i, j + 1);
+			// double move
 			if (j == 1 && getCell(i, 3) == Empty) {
 				validateMove(i, 3);
 			}
 		}
+		// normal capture
 		if (i + 1 < 8) {
 			Cell target = getCell(i + 1, j + 1);
 			if (target != Empty && cellColor(target) == White) {
@@ -81,6 +77,13 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			if (target != Empty && cellColor(target) == White) {
 				validateMove(i - 1, j + 1);
 			}
+		}
+		// en passant capture
+		if (j == 4 && lastMove.y == 6) {
+			if (lastMove.x == i + 1 && getCell(i + 1, j) == WhitePawn)
+				validateMove(i + 1, j + 1);
+			if (lastMove.x == i - 1 && getCell(i - 1, j) == WhitePawn)
+				validateMove(i - 1, j + 1);
 		}
 	}
 	if (piece == WhitePawn) {
@@ -101,6 +104,12 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			if (target != Empty && cellColor(target) == Black) {
 				validateMove(i - 1, j - 1);
 			}
+		}
+		if (j == 3 && lastMove.y == 1) {
+			if (lastMove.x == i + 1 && getCell(i + 1, j) == BlackPawn)
+				validateMove(i + 1, j - 1);
+			if (lastMove.x == i - 1 && getCell(i - 1, j) == BlackPawn)
+				validateMove(i - 1, j - 1);
 		}
 	}
 	if (piece == BlackRook || piece == WhiteRook || piece == BlackQueen || piece == WhiteQueen) {

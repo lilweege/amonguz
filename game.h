@@ -32,25 +32,28 @@ static Color cellColor(Cell cell) {
 	return (cell & 0b1000) ? Black : White;
 }
 
-struct Move {
-	// x (i) => file (col)
-	// y (j) => rank (row)
-	// from -> to
-	olc::vi2d fr, to;
-};
-
 class Game {
 private:
 	std::array<std::array<Cell, 8>, 8> board;
 	Color playerTurn = White;
 
+
+	olc::vi2d lastMove; // for en passant
+
+
+
+	bool
+		WKsCastled = false,
+		WQsCastled = false,
+		BKsCastled = false,
+		BQsCastled = false;
+
+
 private:
 	void initBoard();
-	bool isValidMove(Move move);
-	// void performMove(Move move);
 
 public:
-	// bool tryMove(Move move);
+	void performMove(olc::vi2d fr, olc::vi2d to);
 	
 	unsigned long long getLegalMoves(int i, int j);
 	unsigned long long getLegalMoves(olc::vi2d pos) { return getLegalMoves(pos.x, pos.y); }
@@ -62,6 +65,4 @@ public:
 
 	Cell getCell(int i, int j) { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) { return getCell(pos.x, pos.y); }
-	void setCell(int i, int j, Cell val) { board[i][j] = val; }
-	void setCell(olc::vi2d pos, Cell val) { setCell(pos.x, pos.y, val); }
 };

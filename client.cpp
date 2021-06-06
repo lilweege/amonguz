@@ -185,7 +185,7 @@ private:
 		for (int i = 0; i < 8; ++i)
 			for (int j = 0; j < 8; ++j) {
 				if (((i + j) & 1) == 0)
-					FillRect(i * scale, j * scale, scale, scale, lightColor);
+					fillCell({i, j}, lightColor);
 					
 				
 				if (selectedCell != Empty && i == selectedCellPos.x && j == selectedCellPos.y)
@@ -208,28 +208,21 @@ private:
 				selectedCell = target;
 			}
 		}
-		
+
 		unsigned long long validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
 		SetPixelMode(olc::Pixel::ALPHA);
 		for (int i = 0; i < 8; ++i)
-			for (int j = 0; j < 8; ++j) {
-				bool isValid = (validMoves >> (i * 8 + j)) & 1;
-				if (isValid)
+			for (int j = 0; j < 8; ++j)
+				if ((validMoves >> (i * 8 + j)) & 1)
 					fillCell({i, j}, validColor);
-			}
 		SetPixelMode(olc::Pixel::NORMAL);
+
 		if (selectedCell != Empty) {
 			drawPiece(mousePos.x - scale / 2, mousePos.y - scale / 2, selectedCell);
 			if (GetMouse(0).bReleased) {
 				bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
-				if (isLegal) {
-					game.setCell(currentCellPos, selectedCell);
-					game.setCell(selectedCellPos, Empty);
-					// more logic here unless refactor
-				}
-				else {
-					game.setCell(selectedCellPos, selectedCell);
-				}
+				if (isLegal)
+					game.performMove(selectedCellPos, currentCellPos);
 				selectedCell = Empty;
 			}
 		}
