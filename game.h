@@ -4,39 +4,49 @@
 #include <array>
 
 
-enum Color : bool { White, Black };
+enum Cell : uint8_t {
+	// 'abstract' cells
+	White		= 0b01000,
+	Black		= 0b10000,
+	King		= 0b00001,
+	Queen		= 0b00010,
+	Bishop		= 0b00011,
+	Knight		= 0b00100,
+	Rook		= 0b00101,
+	Pawn		= 0b00110,
 
-enum Cell : unsigned char {
-	Empty 			= 0b0000,
+	// valid cells
+	Empty		= 0,
 
-	WhiteKing		= 0b0001,
-	WhiteQueen		= 0b0010,
-	WhiteBishop		= 0b0011,
-	WhiteKnight		= 0b0100,
-	WhiteRook		= 0b0101,
-	WhitePawn		= 0b0110,
+	WhiteKing		= White | King,
+	WhiteQueen		= White | Queen,
+	WhiteBishop		= White | Bishop,
+	WhiteKnight		= White | Knight,
+	WhiteRook		= White | Rook,
+	WhitePawn		= White | Pawn,
 
-	BlackKing		= 0b1001,
-	BlackQueen		= 0b1010,
-	BlackBishop		= 0b1011,
-	BlackKnight		= 0b1100,
-	BlackRook		= 0b1101,
-	BlackPawn		= 0b1110,
+	BlackKing		= Black | King,
+	BlackQueen		= Black | Queen,
+	BlackBishop		= Black | Bishop,
+	BlackKnight		= Black | Knight,
+	BlackRook		= Black | Rook,
+	BlackPawn		= Black | Pawn,
 };
 
-static unsigned char cellPiece(Cell cell) {
-	return (cell & 0b0111) - 1;
+static Cell cellPiece(Cell cell) {
+	return Cell{(uint8_t)((cell & 0b00111))};
 }
 
-static Color cellColor(Cell cell) {
-	return (cell & 0b1000) ? Black : White;
+static bool cellIsWhite(Cell cell) {
+	return cell & White;
 }
 
 class Game {
 private:
 	std::array<std::array<Cell, 8>, 8> board;
 	std::array<std::array<Cell, 8>, 8> tempBoard; // for king check
-	Color playerTurn = White;
+	bool isWhiteTurn = true;
+	// Color playerTurn = White;
 
 
 	olc::vi2d lastMove; // for en passant
@@ -56,8 +66,8 @@ private:
 public:
 	void performMove(olc::vi2d fr, olc::vi2d to);
 	
-	unsigned long long getLegalMoves(int i, int j) const;
-	unsigned long long getLegalMoves(olc::vi2d pos) const { return getLegalMoves(pos.x, pos.y); }
+	uint64_t getLegalMoves(int i, int j) const;
+	uint64_t getLegalMoves(olc::vi2d pos) const { return getLegalMoves(pos.x, pos.y); }
 
 
 	Game() {
@@ -66,5 +76,7 @@ public:
 
 	Cell getCell(int i, int j) { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) { return getCell(pos.x, pos.y); }
-	Color getTurn() { return playerTurn; }
+	void setCell(int i, int j, Cell val)  { board[i][j] = val; }
+	void setCell(olc::vi2d pos, Cell val) { setCell(pos.x, pos.y, val); }
+	bool getWhiteTurn() { return isWhiteTurn; }
 };

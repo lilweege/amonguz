@@ -48,6 +48,14 @@ private:
 
 	int scale;
 	Game game;
+	bool isPlayerWhite = true;
+	// Color playerColor = White;
+	bool promotionPrompt = false;
+	Cell promotionPiece = Queen;
+	olc::vi2d promotionCellPos;
+
+	olc::vi2d selectedCellPos;
+	Cell selectedCell = Empty;
 
 	olc::Pixel
 		darkColor = olc::VERY_DARK_CYAN,
@@ -157,19 +165,15 @@ private:
 		msg << me;
 		Send(msg);
 	}
-	
 
-	olc::vi2d selectedCellPos;
-	Cell selectedCell = Empty;
-
-	void fillCell(olc::vi2d cellPos, olc::Pixel color) {
+	void drawCell(olc::vi2d cellPos, olc::Pixel color) {
 		FillRect(cellPos * scale, { scale, scale }, color);
 	}
 
 	void drawPiece(int x, int y, Cell cell) {
 		// assert(cell != Empty);
-		int piece = cellPiece(cell);
-		int color = cellColor(cell);
+		int piece = cellPiece(cell) - 1;
+		int color = cellIsWhite(cell) ? 0 : 1;
 		DrawPartialDecal(
 			{ float(x), float(y) },
 			{ float(scale), float(scale) },
@@ -179,50 +183,86 @@ private:
 		);
 	}
 
-	void drawSidebar() {
-		// FillRect({8 * scale, 0}, {ScreenWidth() - 8 * scale, ScreenHeight()});
-		Color turn = game.getTurn();
-		// std::string turnPromptText = turn == White ? "White Turn" : "Black Turn";
-		std::string turnPromptText = turn == White ? "Your Turn" : "Waiting For\nOpponent...";
-		auto strWidth = [] (const std::string& str) {
-			int best = 0,
-				curr = 0;
-			for (char c : str) {
-				if (c == '\n') {
-					curr = 0;
-					continue;
-				}
-				++curr;
-				if (best < curr)
-					best = curr;
-			}
-			return best;
-		};
-		olc::Pixel turnPromptColor = turn == White ? olc::WHITE : olc::BLACK;
-		int turnPromptScale = 2;
-		DrawString(
-			{8 * scale + (ScreenWidth() - 8 * scale - int(strWidth(turnPromptText) * 8 * turnPromptScale)) / 2, 0},
-			turnPromptText, turnPromptColor, turnPromptScale);
-	}
-
 	void drawBoard() {
 		for (int i = 0; i < 8; ++i)
 			for (int j = 0; j < 8; ++j) {
 				if (((i + j) & 1) == 0)
-					fillCell({i, j}, lightColor);
+					drawCell({i, j}, lightColor);
 				
-				if (selectedCell != Empty &&
-					i == selectedCellPos.x &&
-					j == selectedCellPos.y)
+				olc::vi2d cellPos = { i, j };
+				if (promotionPrompt) {
+					if (cellPos == promotionCellPos) {
+						drawPiece(i * scale, j * scale, Cell{uint8_t((game.getWhiteTurn() ? White : Black) | promotionPiece)});
+						continue;
+					}
+					if (cellPos == selectedCellPos)
+						continue;
+				}
+				if (cellPos == selectedCellPos &&
+					selectedCell != Empty)
 					continue;
-				Cell cell = game.getCell(i, j);
-				if (cell == Empty)
+				
+				Cell piece = game.getCell(cellPos);
+				if (piece == Empty)
 					continue;
-				drawPiece(i * scale, j * scale, cell);
+				drawPiece(i * scale, j * scale, piece);
 			}
 		
 		if (selectedCell != Empty)
 			drawPiece(GetMouseX() - scale / 2, GetMouseY() - scale / 2, selectedCell);
+	}
+
+	void drawSidebar() {
+		{
+			bool isWhiteTurn = game.getWhiteTurn();
+			olc::Pixel turnPromptColor = isWhiteTurn ? olc::WHITE : olc::BLACK;
+			// std::string turnPromptText = isWhiteTurn ? "White Turn" : "Black Turn";
+			std::string turnPromptText = isWhiteTurn == isPlayerWhite ? "Your Turn" : "Waiting For\nOpponent...";
+			auto strWidth = [] (const std::string& str) {
+				int best = 0,
+					curr = 0;
+				for (char c : str) {
+					if (c == '\n') {
+						curr = 0;
+						continue;
+					}
+					++curr;
+					if (best < curr)
+						best = curr;
+				}
+				return best;
+			};
+			int turnPromptScale = 2;
+			DrawString(
+				{8 * scale + (ScreenWidth() - 8 * scale - int(strWidth(turnPromptText) * 8 * turnPromptScale)) / 2, 0},
+				turnPromptText, turnPromptColor, turnPromptScale);
+		}
+		
+		if (promotionPrompt) {
+			promotionPiece = Pawn;
+			for (uint8_t pieceType = Queen; pieceType <= Rook; ++pieceType) {
+				Cell coloredPiece = Cell{(uint8_t)((game.getWhiteTurn() ? White : Black) | pieceType)};
+				int sx = 8 * scale + (ScreenWidth() - 8 * scale - scale) / 2,
+					sy = (pieceType - King) * scale,
+					mx = GetMouseX(),
+					my = GetMouseY();
+				FillRect({sx, sy}, {scale, scale}, lightColor);
+				if (sx < mx && mx < sx + scale && sy < my && my < sy + scale) {
+					SetPixelMode(olc::Pixel::ALPHA);
+					FillRect({sx, sy}, {scale, scale}, validColor);
+					SetPixelMode(olc::Pixel::NORMAL);
+					promotionPiece = coloredPiece;
+					if (GetMouse(0).bReleased) {
+						promotionPrompt = false;
+						game.setCell(selectedCellPos, promotionPiece);
+						game.performMove(selectedCellPos, promotionCellPos);
+						// break;
+					}
+				}
+
+				drawPiece(sx, sy, coloredPiece);
+			}
+		}
 	}
 
 	void redraw() {
@@ -234,9 +274,9 @@ private:
 		// TODO: move some of this stuff to another function
 		olc::vi2d mousePos = GetMousePos();
 		olc::vi2d currentCellPos{ mousePos.x / scale, mousePos.y / scale };
-		if (mousePos.x < ScreenHeight() && mousePos.y < ScreenHeight()) {
-			fillCell(currentCellPos, hoverColor);
-
+		if (!promotionPrompt && mousePos.x < ScreenHeight() && mousePos.y < ScreenHeight()) {
+			drawCell(currentCellPos, hoverColor);
+			
 			if (GetMouse(0).bPressed) {
 				Cell target = game.getCell(currentCellPos);
 				if (target != Empty) {
@@ -244,22 +284,30 @@ private:
 					selectedCell = target;
 				}
 			}
-			unsigned long long validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
+			uint64_t validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
 			SetPixelMode(olc::Pixel::ALPHA);
 			for (int i = 0; i < 8; ++i)
 				for (int j = 0; j < 8; ++j)
 					if ((validMoves >> (i * 8 + j)) & 1)
-						fillCell({i, j}, validColor);
+						drawCell({i, j}, validColor);
 			SetPixelMode(olc::Pixel::NORMAL);
 			if (selectedCell != Empty) {
-				if (GetMouse(0).bReleased) {
+				if (GetMouse(0).bReleased && !promotionPrompt) {
 					bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
-					if (isLegal)
-						game.performMove(selectedCellPos, currentCellPos);
+					if (isLegal) {
+						if (cellPiece(selectedCell) == Pawn &&
+							currentCellPos.y == (cellIsWhite(selectedCell) ? 0 : 7)) {
+							promotionCellPos = currentCellPos;
+							promotionPrompt = true;
+						}
+						else
+							game.performMove(selectedCellPos, currentCellPos);
+					}
 					selectedCell = Empty;
 				}
 			}
 		}
+		
 
 		// for (const auto& [id, player]: players) {
 		// 	olc::vf2d pos = { player.posX, player.posY }; pos *= worldScale;
