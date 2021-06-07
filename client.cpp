@@ -48,7 +48,7 @@ private:
 
 	int scale;
 	Game game;
-	
+
 	olc::Pixel
 		darkColor = olc::VERY_DARK_CYAN,
 		lightColor = olc::WHITE,
@@ -179,16 +179,41 @@ private:
 		);
 	}
 
-	void redraw() {
-		Clear(darkColor);
-		
+	void drawSidebar() {
+		// FillRect({8 * scale, 0}, {ScreenWidth() - 8 * scale, ScreenHeight()});
+		Color turn = game.getTurn();
+		// std::string turnPromptText = turn == White ? "White Turn" : "Black Turn";
+		std::string turnPromptText = turn == White ? "Your Turn" : "Waiting For\nOpponent...";
+		auto strWidth = [] (const std::string& str) {
+			int best = 0,
+				curr = 0;
+			for (char c : str) {
+				if (c == '\n') {
+					curr = 0;
+					continue;
+				}
+				++curr;
+				if (best < curr)
+					best = curr;
+			}
+			return best;
+		};
+		olc::Pixel turnPromptColor = turn == White ? olc::WHITE : olc::BLACK;
+		int turnPromptScale = 2;
+		DrawString(
+			{8 * scale + (ScreenWidth() - 8 * scale - int(strWidth(turnPromptText) * 8 * turnPromptScale)) / 2, 0},
+			turnPromptText, turnPromptColor, turnPromptScale);
+	}
+
+	void drawBoard() {
 		for (int i = 0; i < 8; ++i)
 			for (int j = 0; j < 8; ++j) {
 				if (((i + j) & 1) == 0)
 					fillCell({i, j}, lightColor);
-					
 				
-				if (selectedCell != Empty && i == selectedCellPos.x && j == selectedCellPos.y)
+				if (selectedCell != Empty &&
+					i == selectedCellPos.x &&
+					j == selectedCellPos.y)
 					continue;
 				Cell cell = game.getCell(i, j);
 				if (cell == Empty)
@@ -196,37 +221,45 @@ private:
 				drawPiece(i * scale, j * scale, cell);
 			}
 		
+		if (selectedCell != Empty)
+			drawPiece(GetMouseX() - scale / 2, GetMouseY() - scale / 2, selectedCell);
+	}
+
+	void redraw() {
+		Clear(darkColor);
+
+		drawBoard();
+		drawSidebar();
+		
 		// TODO: move some of this stuff to another function
 		olc::vi2d mousePos = GetMousePos();
 		olc::vi2d currentCellPos{ mousePos.x / scale, mousePos.y / scale };
-		fillCell(currentCellPos, hoverColor);
+		if (mousePos.x < ScreenHeight() && mousePos.y < ScreenHeight()) {
+			fillCell(currentCellPos, hoverColor);
 
-		if (GetMouse(0).bPressed) {
-			Cell target = game.getCell(currentCellPos);
-			if (target != Empty) {
-				selectedCellPos = currentCellPos;
-				selectedCell = target;
+			if (GetMouse(0).bPressed) {
+				Cell target = game.getCell(currentCellPos);
+				if (target != Empty) {
+					selectedCellPos = currentCellPos;
+					selectedCell = target;
+				}
+			}
+			unsigned long long validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
+			SetPixelMode(olc::Pixel::ALPHA);
+			for (int i = 0; i < 8; ++i)
+				for (int j = 0; j < 8; ++j)
+					if ((validMoves >> (i * 8 + j)) & 1)
+						fillCell({i, j}, validColor);
+			SetPixelMode(olc::Pixel::NORMAL);
+			if (selectedCell != Empty) {
+				if (GetMouse(0).bReleased) {
+					bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
+					if (isLegal)
+						game.performMove(selectedCellPos, currentCellPos);
+					selectedCell = Empty;
+				}
 			}
 		}
-
-		unsigned long long validMoves = game.getLegalMoves((selectedCell == Empty) ? currentCellPos : selectedCellPos);
-		SetPixelMode(olc::Pixel::ALPHA);
-		for (int i = 0; i < 8; ++i)
-			for (int j = 0; j < 8; ++j)
-				if ((validMoves >> (i * 8 + j)) & 1)
-					fillCell({i, j}, validColor);
-		SetPixelMode(olc::Pixel::NORMAL);
-
-		if (selectedCell != Empty) {
-			drawPiece(mousePos.x - scale / 2, mousePos.y - scale / 2, selectedCell);
-			if (GetMouse(0).bReleased) {
-				bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
-				if (isLegal)
-					game.performMove(selectedCellPos, currentCellPos);
-				selectedCell = Empty;
-			}
-		}
-		
 
 		// for (const auto& [id, player]: players) {
 		// 	olc::vf2d pos = { player.posX, player.posY }; pos *= worldScale;
@@ -265,7 +298,7 @@ public:
 		atlasDecal = new olc::Decal(atlasSprite);
 		sheetSize = { 6, 2 };
 		cellSize = { atlasSprite->width / sheetSize.x, atlasSprite->height / sheetSize.y };
-		scale = ScreenWidth() / 8;
+		scale = ScreenHeight() / 8;
 
 		return true;
 	}
@@ -308,6 +341,6 @@ int main() {
 
 	AmonguzClient client(SERVER_ADDR, SERVER_PORT);
 	
-	if (client.Construct(480, 480, 1, 1))
+	if (client.Construct(660, 480, 1, 1))
 		client.Start();
 }

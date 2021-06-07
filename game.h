@@ -35,6 +35,7 @@ static Color cellColor(Cell cell) {
 class Game {
 private:
 	std::array<std::array<Cell, 8>, 8> board;
+	std::array<std::array<Cell, 8>, 8> tempBoard; // for king check
 	Color playerTurn = White;
 
 
@@ -55,8 +56,8 @@ private:
 public:
 	void performMove(olc::vi2d fr, olc::vi2d to);
 	
-	unsigned long long getLegalMoves(int i, int j);
-	unsigned long long getLegalMoves(olc::vi2d pos) { return getLegalMoves(pos.x, pos.y); }
+	unsigned long long getLegalMoves(int i, int j) const;
+	unsigned long long getLegalMoves(olc::vi2d pos) const { return getLegalMoves(pos.x, pos.y); }
 
 
 	Game() {
@@ -65,4 +66,5 @@ public:
 
 	Cell getCell(int i, int j) { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) { return getCell(pos.x, pos.y); }
+	Color getTurn() { return playerTurn; }
 };

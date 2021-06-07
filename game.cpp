@@ -24,14 +24,30 @@ void Game::initBoard() {
 void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 	board[to.x][to.y] = board[fr.x][fr.y];
 	board[fr.x][fr.y] = Empty;
-	// en passant
-	if (board[to.x][to.y] == BlackPawn && board[to.x][to.y - 1] == WhitePawn)
-		board[to.x][to.y - 1] = Empty;
-	else if (board[to.x][to.y] == WhitePawn && board[to.x][to.y + 1] == BlackPawn)
-		board[to.x][to.y + 1] = Empty;
 
-	// TODO: pawn promotion
-	
+	// en passant, promotion
+	int i = to.x,
+		j = to.y;
+	if (board[i][j] == BlackPawn || board[i][j] == WhitePawn) {
+		if (board[i][j] == WhitePawn) {
+			if (j == 2 && lastMove.y == 1 && board[i][3] == BlackPawn) {
+				board[i][3] = Empty;
+			}
+			else if (j == 0) {
+				// TODO: get piece as input
+				board[i][j] = WhiteQueen;
+			}
+		}
+		else {
+			if (j == 5 && lastMove.y == 6 && board[i][4] == WhitePawn) {
+				board[i][4] = Empty;
+			}
+			else if (j == 7) {
+				//
+				board[i][j] = BlackQueen;
+			}
+		}
+	}
 
 
 	// TODO: online stuff
@@ -40,17 +56,16 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 }
 
 // TODO: refactor
-// TODO: en passant and castling
+// TODO: castling
 // TODO: king in check move rules
 // FIXME: test and catch all edge cases (there will be many)
-unsigned long long Game::getLegalMoves(int i, int j) {
+unsigned long long Game::getLegalMoves(int i, int j) const {
 	unsigned long long moves = 0ULL;
 	auto validateMove = [&moves] (int x, int y) {
 		moves |= (1ULL << (x * 8 + y));
 	};
 
-
-	Cell piece = getCell(i, j);
+	Cell piece = board[i][j];
 	// assert(piece != Empty);
 	if (cellColor(piece) != playerTurn)
 		return moves;
@@ -58,63 +73,63 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 	// a pawn should never exist on the first or last rank
 	if (piece == BlackPawn) {
 		// normal move
-		if (getCell(i, j + 1) == Empty) {
+		if (board[i][j + 1] == Empty) {
 			validateMove(i, j + 1);
 			// double move
-			if (j == 1 && getCell(i, 3) == Empty) {
+			if (j == 1 && board[i][3] == Empty) {
 				validateMove(i, 3);
 			}
 		}
 		// normal capture
 		if (i + 1 < 8) {
-			Cell target = getCell(i + 1, j + 1);
+			Cell target = board[i + 1][j + 1];
 			if (target != Empty && cellColor(target) == White) {
 				validateMove(i + 1, j + 1);
 			}
 		}
 		if (i - 1 >= 0) {
-			Cell target = getCell(i - 1, j + 1);
+			Cell target = board[i - 1][j + 1];
 			if (target != Empty && cellColor(target) == White) {
 				validateMove(i - 1, j + 1);
 			}
 		}
 		// en passant capture
 		if (j == 4 && lastMove.y == 6) {
-			if (lastMove.x == i + 1 && getCell(i + 1, j) == WhitePawn)
+			if (lastMove.x == i + 1 && board[i + 1][j] == WhitePawn)
 				validateMove(i + 1, j + 1);
-			if (lastMove.x == i - 1 && getCell(i - 1, j) == WhitePawn)
+			if (lastMove.x == i - 1 && board[i - 1][j] == WhitePawn)
 				validateMove(i - 1, j + 1);
 		}
 	}
 	if (piece == WhitePawn) {
-		if (getCell(i, j - 1) == Empty) {
+		if (board[i][j - 1] == Empty) {
 			validateMove(i, j - 1);
-			if (j == 6 && getCell(i, 4) == Empty) {
+			if (j == 6 && board[i][4] == Empty) {
 				validateMove(i, 4);
 			}
 		}
 		if (i + 1 < 8) {
-			Cell target = getCell(i + 1, j - 1);
+			Cell target = board[i + 1][j - 1];
 			if (target != Empty && cellColor(target) == Black) {
 				validateMove(i + 1, j - 1);
 			}
 		}
 		if (i - 1 >= 0) {
-			Cell target = getCell(i - 1, j - 1);
+			Cell target = board[i - 1][j - 1];
 			if (target != Empty && cellColor(target) == Black) {
 				validateMove(i - 1, j - 1);
 			}
 		}
 		if (j == 3 && lastMove.y == 1) {
-			if (lastMove.x == i + 1 && getCell(i + 1, j) == BlackPawn)
+			if (lastMove.x == i + 1 && board[i + 1][j] == BlackPawn)
 				validateMove(i + 1, j - 1);
-			if (lastMove.x == i - 1 && getCell(i - 1, j) == BlackPawn)
+			if (lastMove.x == i - 1 && board[i - 1][j] == BlackPawn)
 				validateMove(i - 1, j - 1);
 		}
 	}
 	if (piece == BlackRook || piece == WhiteRook || piece == BlackQueen || piece == WhiteQueen) {
 		for (int x = i + 1; x < 8; ++x) {
-			Cell target = getCell(x, j);
+			Cell target = board[x][j];
 			if (target == Empty) {
 				validateMove(x, j);
 				continue;
@@ -124,7 +139,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int x = i - 1; x >= 0; --x) {
-			Cell target = getCell(x, j);
+			Cell target = board[x][j];
 			if (target == Empty) {
 				validateMove(x, j);
 				continue;
@@ -134,7 +149,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int y = j + 1; y < 8; ++y) {
-			Cell target = getCell(i, y);
+			Cell target = board[i][y];
 			if (target == Empty) {
 				validateMove(i, y);
 				continue;
@@ -144,7 +159,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int y = j - 1; y >= 0; --y) {
-			Cell target = getCell(i, y);
+			Cell target = board[i][y];
 			if (target == Empty) {
 				validateMove(i, y);
 				continue;
@@ -156,7 +171,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 	}
 	if (piece == BlackBishop || piece == WhiteBishop || piece == BlackQueen || piece == WhiteQueen) {
 		for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y) {
-			Cell target = getCell(x, y);
+			Cell target = board[x][y];
 			if (target == Empty) {
 				validateMove(x, y);
 				continue;
@@ -166,7 +181,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y) {
-			Cell target = getCell(x, y);
+			Cell target = board[x][y];
 			if (target == Empty) {
 				validateMove(x, y);
 				continue;
@@ -176,7 +191,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y) {
-			Cell target = getCell(x, y);
+			Cell target = board[x][y];
 			if (target == Empty) {
 				validateMove(x, y);
 				continue;
@@ -186,7 +201,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			break;
 		}
 		for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y) {
-			Cell target = getCell(x, y);
+			Cell target = board[x][y];
 			if (target == Empty) {
 				validateMove(x, y);
 				continue;
@@ -201,7 +216,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			for (int y = j - 2; y <= j + 2; y += 4) {
 				if (x < 0 || x >= 8 || y < 0 || y >= 8)
 					continue;
-				Cell target = getCell(x, y);
+				Cell target = board[x][y];
 				if (target == Empty || cellColor(target) != cellColor(piece))
 					validateMove(x, y);
 			}
@@ -210,7 +225,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			for (int y = j - 1; y <= j + 1; y += 2) {
 				if (x < 0 || x >= 8 || y < 0 || y >= 8)
 					continue;
-				Cell target = getCell(x, y);
+				Cell target = board[x][y];
 				if (target == Empty || cellColor(target) != cellColor(piece))
 					validateMove(x, y);
 			}
@@ -222,7 +237,7 @@ unsigned long long Game::getLegalMoves(int i, int j) {
 			for (int y = j - 1; y <= j + 1; ++y) {
 				if ((x == i && y == j) || x < 0 || x >= 8 || y < 0 || y >= 8)
 					continue;
-				Cell target = getCell(x, y);
+				Cell target = board[x][y];
 				if (target == Empty || cellColor(target) != cellColor(piece))
 					validateMove(x, y);
 			}
