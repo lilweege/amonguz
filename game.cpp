@@ -1,27 +1,152 @@
 #include "game.h"
 
+// https://www.chessprogramming.org/
+// https://chess.org/rules
 
-// TODO: read state from FEN code
-// void Game::fromFEN() {}
-
-void Game::initBoard() {
-	board[0][0] = BlackRook;		board[0][7] = WhiteRook;
-	board[1][0] = BlackKnight;		board[1][7] = WhiteKnight;
-	board[2][0] = BlackBishop;		board[2][7] = WhiteBishop;
-	board[3][0] = BlackQueen;		board[3][7] = WhiteQueen;
-	board[4][0] = BlackKing;		board[4][7] = WhiteKing;
-	board[5][0] = BlackBishop;		board[5][7] = WhiteBishop;
-	board[6][0] = BlackKnight;		board[6][7] = WhiteKnight;
-	board[7][0] = BlackRook;		board[7][7] = WhiteRook;
-	for (int i = 0; i < 8; ++i) {
-		board[i][1] = BlackPawn;
-		board[i][6] = WhitePawn;
-		for (int j = 2; j < 6; ++j)
-			board[i][j] = Empty;
+Cell Game::pieceFromChar(char pieceChar) {
+	switch (pieceChar) {
+		case 'K': return WhiteKing;
+		case 'k': return BlackKing;
+		case 'Q': return WhiteQueen;
+		case 'q': return BlackQueen;
+		case 'B': return WhiteBishop;
+		case 'b': return BlackBishop;
+		case 'N': return WhiteKnight;
+		case 'n': return BlackKnight;
+		case 'R': return WhiteRook;
+		case 'r': return BlackRook;
+		case 'P': return WhitePawn;
+		case 'p': return BlackPawn;
+		default: return Empty;
 	}
 }
 
+void Game::fromFEN(const std::string& sequence) {
+	// assume sequence is valid (because I'm lazy)
+	// fields are space-separated subsequences
+
+	// field 1: piece placement
+	for (int i = 0; i < 8; ++i)
+		for (int j = 0; j < 8; ++j)
+			board[i][j] = Empty;
+
+	size_t idx = 0;
+	for (int i = 0, j = 0; idx < sequence.size(); ++idx) {
+		char c = sequence[idx];
+		if (c == ' ')
+			break;
+		if (c == '/') {
+			++j;
+			i = 0;
+			continue;
+		}
+		if ('1' <= c && c <= '8') {
+			i += c - '0';
+		}
+		else {
+			board[i][j] = Game::pieceFromChar(c);
+			++i;
+		}
+	}
+	++idx;
+
+	// state conditions
+	// field 2: active color
+	// <Side to move> ::= {'w' | 'b'}
+	isWhiteTurn = sequence[idx] == 'w';
+	idx += 2;
+	
+	// field 3: castling rights
+	// <Castling ability> ::= '-' | ['K'] ['Q'] ['k'] ['q'] (1..4)
+	WKsCanCastle = false;
+	WQsCanCastle = false;
+	BKsCanCastle = false;
+	BQsCanCastle = false;
+	if (sequence[idx] == '-') {
+		idx += 2;
+	}
+	else {
+		// the field should be ordered anyways, but
+		// this way of doing it is simple enough
+		for (; idx < sequence.size(); ++idx) {
+			char c = sequence[idx];
+			if (c == ' ')
+				break;
+			switch (c) {
+				case 'K': WKsCanCastle = true; break;
+				case 'Q': WQsCanCastle = true; break;
+				case 'k': BKsCanCastle = true; break;
+				case 'q': BQsCanCastle = true; break;
+				default: break;
+			}
+		}
+		++idx;
+	}
+
+	// field 4: possible en passant targets
+	// <En passant target square> ::= '-' | <epsquare>
+	// <epsquare>   ::= <fileLetter> <eprank>
+	// <fileLetter> ::= 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h'
+	// <eprank>     ::= '3' | '6'
+	if (sequence[idx] == '-') {
+		idx += 2;
+	}
+	else {
+		// position 'behind' the moved pawn
+		char file = sequence[idx++]; // a single letter
+		char rank = sequence[idx++]; // a single digit
+		int i = file - 'a';
+		// int j = 8 - (rank - '0');
+		// if (j == 2) // black pawn moved
+		if (rank == '6')
+			lastMove = { i, 1 };
+		// else if (j == 5) // white ...
+		else if (rank == '3')
+			lastMove = { i, 6 };
+		++idx;
+	}
+
+	// field 5: halfmove clock
+	// <Halfmove Clock> ::= <digit> {<digit>}
+	// <digit> ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+	int end = sequence.find(' ', idx);
+	halfmoveClock = atoi(sequence.substr(idx, end - idx).c_str());
+	idx = end;
+
+	// field 6: fullmove counter
+	// <Fullmove counter> ::= <digit19> {<digit>}
+	// <digit19> ::= '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+	// <digit>   ::= '0' | <digit19>
+	fullmoveCounter = atoi(sequence.substr(idx).c_str());
+}
+
+int Game::addBoardToHistory() {
+	// faux FEN code as string for hashable type
+	std::string currentBoardHash;
+	currentBoardHash.reserve(64 + 5); // nice
+	for (int i = 0; i < 8; ++i)
+		for (int j = 0; j < 8; ++j)
+			currentBoardHash.push_back(board[i][j]);
+	currentBoardHash.push_back(isWhiteTurn);
+	currentBoardHash.push_back(BQsCanCastle);
+	currentBoardHash.push_back(BKsCanCastle);
+	currentBoardHash.push_back(WQsCanCastle);
+	currentBoardHash.push_back(WKsCanCastle);
+	// pawn stucture can't ever the same so
+	// en passant doesn't have to be included (I hope)
+	// however there may be some other weird edge cases
+
+	previousBoards.insert(currentBoardHash);
+	return previousBoards.count(currentBoardHash);
+}
+
 void Game::performMove(olc::vi2d fr, olc::vi2d to) {
+	++halfmoveClock;
+	if (board[to.x][to.y] != Empty)
+		halfmoveClock = 0;
+	if (!isWhiteTurn)
+		++fullmoveCounter;
+	
 	board[to.x][to.y] = board[fr.x][fr.y];
 	board[fr.x][fr.y] = Empty;
 
@@ -29,6 +154,7 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 	int i = to.x,
 		j = to.y;
 	if (cellPiece(board[i][j]) == Pawn) {
+		halfmoveClock = 0;
 		if (board[i][j] == WhitePawn) {
 			if (j == 2 && lastMove.y == 1 && board[i][3] == BlackPawn) {
 				board[i][3] = Empty;
@@ -88,9 +214,24 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 
 	// TODO: online stuff
 	lastMove = fr;
-
 	isWhiteTurn ^= true;
-	// playerTurn = (playerTurn == White) ? Black : White;
+	
+	// fifty-move rule
+	if (halfmoveClock >= 100) {
+		// TODO: end game draw
+		// std::cout << "DRAW\n";
+	}
+	
+	// 3rd repetition rule
+	if (addBoardToHistory() >= 3) {
+		// TODO: end game draw
+		// std::cout << "DRAW\n";
+	}
+
+	// TODO: insuficcient material
+	// TODO: stalemate
+
+	// TODO: checkmate
 }
 
 // TODO: refactor

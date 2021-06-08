@@ -2,7 +2,7 @@
 
 #include "olcPixelGameEngine.h"
 #include <array>
-
+#include <unordered_set>
 
 enum Cell : uint8_t {
 	// 'abstract' cells
@@ -45,14 +45,14 @@ class Game {
 private:
 	std::array<std::array<Cell, 8>, 8> board;
 	std::array<std::array<Cell, 8>, 8> tempBoard; // for king check
-	// int turnNumber = 0;
+	
+	int fullmoveCounter = 0; // this is not really useful for anything
+	int halfmoveClock = 0; // fifty-move rule
 	bool isWhiteTurn = true;
-	// Color playerTurn = White;
-
-
 	olc::vi2d lastMove; // for en passant
-
-
+	
+	// there has to be a better way to do this
+	std::unordered_multiset<std::string> previousBoards; // 3rd repetition rule
 
 	bool
 		WKsCanCastle = true,
@@ -62,7 +62,9 @@ private:
 
 
 private:
-	void initBoard();
+	void fromFEN(const std::string& sequence);
+	static Cell pieceFromChar(char c);
+	int addBoardToHistory(); // add current board to previousBoards, returns count
 
 public:
 	void performMove(olc::vi2d fr, olc::vi2d to);
@@ -72,7 +74,14 @@ public:
 
 
 	Game() {
-		initBoard();
+		fromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); // starting
+		// test
+		// fromFEN("r1b1k1nr/p2p1pNp/n2B4/1p1NP2P/6P1/3P1Q2/P1P1K3/q5b1");
+		// fromFEN("4k2r/6r1/8/8/8/8/3R4/R3K3 w Qk - 0 1"); // castle
+		// fromFEN("rnbqkbnr/pppp1ppp/8/8/3pP3/6PP/PPPP1P11/RNBQKBNR b KQkq e3 0 3"); // en passant
+		// fromFEN("8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50"); // draw
+		
+		addBoardToHistory();
 	}
 
 	Cell getCell(int i, int j) { return board[i][j]; }
