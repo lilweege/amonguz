@@ -45,6 +45,7 @@ class Game {
 private:
 	std::array<std::array<Cell, 8>, 8> board;
 	std::array<std::array<Cell, 8>, 8> tempBoard; // for king check
+	// int turnNumber = 0;
 	bool isWhiteTurn = true;
 	// Color playerTurn = White;
 
@@ -54,10 +55,10 @@ private:
 
 
 	bool
-		WKsCastled = false,
-		WQsCastled = false,
-		BKsCastled = false,
-		BQsCastled = false;
+		WKsCanCastle = true,
+		WQsCanCastle = true,
+		BKsCanCastle = true,
+		BQsCanCastle = true;
 
 
 private:
@@ -76,6 +77,7 @@ public:
 
 	Cell getCell(int i, int j) { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) { return getCell(pos.x, pos.y); }
+	// ideally these would not be public
 	void setCell(int i, int j, Cell val)  { board[i][j] = val; }
 	void setCell(olc::vi2d pos, Cell val) { setCell(pos.x, pos.y, val); }
 	bool getWhiteTurn() { return isWhiteTurn; }
