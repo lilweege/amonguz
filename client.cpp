@@ -172,8 +172,8 @@ private:
 
 	void drawPiece(int x, int y, Cell cell) {
 		// assert(cell != Empty);
-		int piece = cellPiece(cell) - 1;
-		int color = cellIsWhite(cell) ? 0 : 1;
+		int piece = cellType(cell) - 1;
+		int color = cellColor(cell) == White ? 0 : 1;
 		DrawPartialDecal(
 			{ float(x), float(y) },
 			{ float(scale), float(scale) },
@@ -295,8 +295,8 @@ private:
 				if (GetMouse(0).bReleased && !promotionPrompt) {
 					bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
 					if (isLegal) {
-						if (cellPiece(selectedCell) == Pawn &&
-							currentCellPos.y == (cellIsWhite(selectedCell) ? 0 : 7)) {
+						if (cellType(selectedCell) == Pawn &&
+							currentCellPos.y == (cellColor(selectedCell) == White ? 0 : 7)) {
 							promotionCellPos = currentCellPos;
 							promotionPrompt = true;
 						}

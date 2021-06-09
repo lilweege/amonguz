@@ -44,7 +44,7 @@ void Game::fromFEN(const std::string& sequence) {
 			i += c - '0';
 		}
 		else {
-			board[i][j] = Game::pieceFromChar(c);
+			board[i][j] = pieceFromChar(c);
 			++i;
 		}
 	}
@@ -98,11 +98,15 @@ void Game::fromFEN(const std::string& sequence) {
 		int i = file - 'a';
 		// int j = 8 - (rank - '0');
 		// if (j == 2) // black pawn moved
-		if (rank == '6')
-			lastMove = { i, 1 };
+		if (rank == '6') {
+			lastMoveFr = { i, 1 };
+			lastMoveTo = { i, 3 };
+		}
 		// else if (j == 5) // white ...
-		else if (rank == '3')
-			lastMove = { i, 6 };
+		else if (rank == '3') {
+			lastMoveFr = { i, 6 };
+			lastMoveTo = { i, 4 };
+		}
 		++idx;
 	}
 
@@ -147,27 +151,22 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 	if (!isWhiteTurn)
 		++fullmoveCounter;
 	
-	board[to.x][to.y] = board[fr.x][fr.y];
-	board[fr.x][fr.y] = Empty;
-
-	// en passant, promotion
-	int i = to.x,
-		j = to.y;
-	if (cellPiece(board[i][j]) == Pawn) {
+	Cell piece = board[fr.x][fr.y];
+	if (cellType(piece) == Pawn) {
 		halfmoveClock = 0;
-		if (board[i][j] == WhitePawn) {
-			if (j == 2 && lastMove.y == 1 && board[i][3] == BlackPawn) {
-				board[i][3] = Empty;
+		if (cellColor(piece) == White) {
+			if (to.y == 2 && lastMoveFr.y == 1 && lastMoveTo.y == 3 && board[to.x][3] == BlackPawn) {
+				board[to.x][3] = Empty;
 			}
 		}
 		else {
-			if (j == 5 && lastMove.y == 6 && board[i][4] == WhitePawn) {
-				board[i][4] = Empty;
+			if (to.y == 5 && lastMoveFr.y == 6 && lastMoveTo.y == 4 && board[to.x][4] == WhitePawn) {
+				board[to.x][4] = Empty;
 			}
 		}
 	}
-	else if (cellPiece(board[i][j]) == King) {
-		if (board[i][j] == WhiteKing) {
+	else if (cellType(piece) == King) {
+		if (cellColor(piece) == White) {
 			WQsCanCastle = WKsCanCastle = false;
 			if (fr.x == 4 && fr.y == 7) {
 				if (to.x == 2 && to.y == 7) {
@@ -194,26 +193,30 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 			}
 		}
 	}
-	else if (cellPiece(board[i][j]) == Rook) {
+	else if (cellType(piece) == Rook) {
 		// B > Qs (0, 0) | (7, 0) Ks
 		// W > Qs (0, 7) | (7, 7) Ks
-		if (board[i][j] == BlackRook) {
-			if (BKsCanCastle && fr.x == 7 && fr.y == 0)
-				BKsCanCastle = false;
-			else if (BQsCanCastle && fr.x == 0 && fr.y == 0)
-				BQsCanCastle = false;
-		}
-		else {
+		if (cellColor(piece) == White) {
 			if (WKsCanCastle && fr.x == 7 && fr.y == 7)
 				WKsCanCastle = false;
 			else if (WQsCanCastle && fr.x == 0 && fr.y == 7)
 				WQsCanCastle = false;
 		}
+		else {
+			if (BKsCanCastle && fr.x == 7 && fr.y == 0)
+				BKsCanCastle = false;
+			else if (BQsCanCastle && fr.x == 0 && fr.y == 0)
+				BQsCanCastle = false;
+		}
 	}
+
+	board[to.x][to.y] = board[fr.x][fr.y];
+	board[fr.x][fr.y] = Empty;
 
 
 	// TODO: online stuff
-	lastMove = fr;
+	lastMoveFr = fr;
+	lastMoveTo = to;
 	isWhiteTurn ^= true;
 	
 	// fifty-move rule
@@ -234,225 +237,166 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 	// TODO: checkmate
 }
 
-// TODO: refactor
 // TODO: castling
 // TODO: king in check move rules
 // FIXME: test and catch all edge cases (there will be many)
 uint64_t Game::getLegalMoves(int i, int j) const {
-	uint64_t moves = 0ULL;
-	auto validateMove = [&moves] (int x, int y) {
-		moves |= (1ULL << (x * 8 + y));
-	};
-
 	Cell piece = board[i][j];
 	// assert(piece != Empty);
-	if (cellIsWhite(piece) != isWhiteTurn)
-		return moves;
-	
+	if (cellColor(piece) != (isWhiteTurn ? White : Black))
+		return 0ULL; // not your turn
+	return (this->*(pieceMoves[cellType(piece) - King]))(i, j);
+}
+
+
+// returns true if sliding path should end
+// (i, j) -> (x, y)
+bool Game::setMove(uint64_t& moves, int i, int j, int x, int y) const {
+	Cell target = board[x][y];
+	if (target == Empty) {
+		boardSetBit(moves, x, y);
+		return false;
+	}
+	if (cellColor(target) != cellColor(board[i][j]))
+		boardSetBit(moves, x, y);
+	return true;
+}
+
+uint64_t Game::bishopMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y)
+		if (setMove(moves, i, j, x, y)) break;
+	for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y)
+		if (setMove(moves, i, j, x, y)) break;
+	for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y)
+		if (setMove(moves, i, j, x, y)) break;
+	for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y)
+		if (setMove(moves, i, j, x, y)) break;
+	return moves;
+}
+
+uint64_t Game::rookMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	for (int x = i + 1; x < 8; ++x)
+		if (setMove(moves, i, j, x, j)) break;
+	for (int x = i - 1; x >= 0; --x)
+		if (setMove(moves, i, j, x, j)) break;
+	for (int y = j + 1; y < 8; ++y)
+		if (setMove(moves, i, j, i, y)) break;
+	for (int y = j - 1; y >= 0; --y)
+		if (setMove(moves, i, j, i, y)) break;
+	return moves;
+}
+
+uint64_t Game::knightMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	static const int offsets[8] = {-2, -2, -1,  1,  2,  2,  1, -1};
+	for (int idx = 0; idx < 8; ++idx) {
+		int x = offsets[idx],
+			y = offsets[(idx + 2) % 8];
+		if (0 <= i + x && i + x < 8 &&
+			0 <= j + y && j + y < 8)
+			setMove(moves, i, j, i + x, j + y);
+	}
+	return moves;
+}
+
+uint64_t Game::queenMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	moves |= bishopMoves(i, j);
+	moves |= rookMoves(i, j);
+	return moves;
+}
+
+uint64_t Game::castleMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	// castle TODO: check check
+	if (cellColor(board[i][j]) == White) {
+		if (WKsCanCastle) {
+			if (board[5][7] == Empty &&
+				board[6][7] == Empty) {
+				setMove(moves, i, j, 6, 7);
+			}
+		}
+		if (WQsCanCastle) {
+			if (board[1][7] == Empty &&
+				board[2][7] == Empty && 
+				board[3][7] == Empty) {
+				setMove(moves, i, j, 2, 7);
+			}
+		}
+	}
+	else {
+		if (BKsCanCastle) {
+			if (board[5][0] == Empty &&
+				board[6][0] == Empty) {
+				setMove(moves, i, j, 6, 0);
+			}
+		}
+		if (BQsCanCastle) {
+			if (board[1][0] == Empty &&
+				board[2][0] == Empty && 
+				board[3][0] == Empty) {
+				setMove(moves, i, j, 2, 0);
+			}
+		}
+	}
+	return moves;
+}
+
+uint64_t Game::kingMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	for (int x = i - 1; x <= i + 1; ++x)
+		for (int y = j - 1; y <= j + 1; ++y)
+			if ((i != x || j != y) &&
+				0 <= x && x < 8 &&
+				0 <= y && y < 8)
+				setMove(moves, i, j, x, y);
+	moves |= castleMoves(i, j);
+	return moves;
+}
+
+uint64_t Game::enPassantMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	Cell pawnColor = cellColor(board[i][j]);
+	int firstRank = pawnColor == White ? 6 : 1,
+		direction = pawnColor == White ? -1 : 1;
+	if (j == firstRank + direction * 3 &&
+		lastMoveTo.y == j &&
+		lastMoveFr.y == firstRank + direction * 5) {
+		Cell targetPawn = Cell{(uint8_t)((pawnColor == White ? Black : White) | Pawn)};
+		if (lastMoveFr.x == i + 1 && board[i + 1][j] == targetPawn)
+			setMove(moves, i, j, i + 1, j + direction);
+		if (lastMoveFr.x == i - 1 && board[i - 1][j] == targetPawn)
+			setMove(moves, i, j, i - 1, j + direction);
+	}
+	return moves;
+}
+
+uint64_t Game::pawnMoves(int i, int j) const {
+	uint64_t moves = 0ULL;
+	Cell pawnColor = cellColor(board[i][j]);
+	int firstRank = pawnColor == White ? 6 : 1,
+		direction = pawnColor == White ? -1 : 1;
 	// a pawn should never exist on the first or last rank
-	if (piece == BlackPawn) {
-		// normal move
-		if (board[i][j + 1] == Empty) {
-			validateMove(i, j + 1);
-			// double move
-			if (j == 1 && board[i][3] == Empty) {
-				validateMove(i, 3);
-			}
-		}
-		// normal capture
-		if (i + 1 < 8) {
-			Cell target = board[i + 1][j + 1];
-			if (target != Empty && cellIsWhite(target) != cellIsWhite(piece)) {
-				validateMove(i + 1, j + 1);
-			}
-		}
-		if (i - 1 >= 0) {
-			Cell target = board[i - 1][j + 1];
-			if (target != Empty && cellIsWhite(target) != cellIsWhite(piece)) {
-				validateMove(i - 1, j + 1);
-			}
-		}
-		// en passant capture
-		if (j == 4 && lastMove.y == 6) {
-			if (lastMove.x == i + 1 && board[i + 1][j] == WhitePawn)
-				validateMove(i + 1, j + 1);
-			if (lastMove.x == i - 1 && board[i - 1][j] == WhitePawn)
-				validateMove(i - 1, j + 1);
-		}
-	}
-	if (piece == WhitePawn) {
-		if (board[i][j - 1] == Empty) {
-			validateMove(i, j - 1);
-			if (j == 6 && board[i][4] == Empty) {
-				validateMove(i, 4);
-			}
-		}
-		if (i + 1 < 8) {
-			Cell target = board[i + 1][j - 1];
-			if (target != Empty && cellIsWhite(target) != cellIsWhite(piece)) {
-				validateMove(i + 1, j - 1);
-			}
-		}
-		if (i - 1 >= 0) {
-			Cell target = board[i - 1][j - 1];
-			if (target != Empty && cellIsWhite(target) != cellIsWhite(piece)) {
-				validateMove(i - 1, j - 1);
-			}
-		}
-		if (j == 3 && lastMove.y == 1) {
-			if (lastMove.x == i + 1 && board[i + 1][j] == BlackPawn)
-				validateMove(i + 1, j - 1);
-			if (lastMove.x == i - 1 && board[i - 1][j] == BlackPawn)
-				validateMove(i - 1, j - 1);
-		}
-	}
-	if (cellPiece(piece) == Rook || cellPiece(piece) == Queen) {
-		for (int x = i + 1; x < 8; ++x) {
-			Cell target = board[x][j];
-			if (target == Empty) {
-				validateMove(x, j);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, j);
-			break;
-		}
-		for (int x = i - 1; x >= 0; --x) {
-			Cell target = board[x][j];
-			if (target == Empty) {
-				validateMove(x, j);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, j);
-			break;
-		}
-		for (int y = j + 1; y < 8; ++y) {
-			Cell target = board[i][y];
-			if (target == Empty) {
-				validateMove(i, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(i, y);
-			break;
-		}
-		for (int y = j - 1; y >= 0; --y) {
-			Cell target = board[i][y];
-			if (target == Empty) {
-				validateMove(i, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(i, y);
-			break;
-		}
-	}
-	if (cellPiece(piece) == Bishop || cellPiece(piece) == Queen) {
-		for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y) {
-			Cell target = board[x][y];
-			if (target == Empty) {
-				validateMove(x, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, y);
-			break;
-		}
-		for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y) {
-			Cell target = board[x][y];
-			if (target == Empty) {
-				validateMove(x, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, y);
-			break;
-		}
-		for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y) {
-			Cell target = board[x][y];
-			if (target == Empty) {
-				validateMove(x, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, y);
-			break;
-		}
-		for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y) {
-			Cell target = board[x][y];
-			if (target == Empty) {
-				validateMove(x, y);
-				continue;
-			}
-			if (cellIsWhite(target) != cellIsWhite(piece))
-				validateMove(x, y);
-			break;
-		}
-	}
-	if (cellPiece(piece) == Knight) {
-		for (int x = i - 1; x <= i + 1; x += 2) {
-			for (int y = j - 2; y <= j + 2; y += 4) {
-				if (x < 0 || x >= 8 || y < 0 || y >= 8)
-					continue;
-				Cell target = board[x][y];
-				if (target == Empty || cellIsWhite(target) != cellIsWhite(piece))
-					validateMove(x, y);
-			}
-		}
-		for (int x = i - 2; x <= i + 2; x += 4) {
-			for (int y = j - 1; y <= j + 1; y += 2) {
-				if (x < 0 || x >= 8 || y < 0 || y >= 8)
-					continue;
-				Cell target = board[x][y];
-				if (target == Empty || cellIsWhite(target) != cellIsWhite(piece))
-					validateMove(x, y);
-			}
-		}
-	}
-	if (cellPiece(piece) == King) {
-		// TODO: castling
-		for (int x = i - 1; x <= i + 1; ++x) {
-			for (int y = j - 1; y <= j + 1; ++y) {
-				if ((x == i && y == j) || x < 0 || x >= 8 || y < 0 || y >= 8)
-					continue;
-				Cell target = board[x][y];
-				if (target == Empty || cellIsWhite(target) != cellIsWhite(piece))
-					validateMove(x, y);
-			}
-		}
-		if (piece == WhiteKing) {
-			if (WKsCanCastle) {
-				if (board[5][7] == Empty &&
-					board[6][7] == Empty) {
-					validateMove(6, 7);
-				}
-			}
-			if (WQsCanCastle) {
-				if (board[1][7] == Empty &&
-					board[2][7] == Empty && 
-					board[3][7] == Empty) {
-					validateMove(2, 7);
-				}
-			}
-		}
-		else {
-			if (BKsCanCastle) {
-				if (board[5][0] == Empty &&
-					board[6][0] == Empty) {
-					validateMove(6, 0);
-				}
-			}
-			if (BQsCanCastle) {
-				if (board[1][0] == Empty &&
-					board[2][0] == Empty && 
-					board[3][0] == Empty) {
-					validateMove(2, 0);
-				}
-			}
-		}
+	// normal move
+	if (board[i][j + direction] == Empty) {
+		setMove(moves, i, j, i, j + direction);
+		// double move
+		if (board[i][j + direction * 2] == Empty && j == firstRank)
+			setMove(moves, i, j, i, j + direction * 2);
 	}
 
+	// normal capture
+	if (i + 1 < 8 &&
+		board[i + 1][j + direction] != Empty &&
+		cellColor(board[i + 1][j + direction]) != pawnColor)
+		setMove(moves, i, j, i + 1, j + direction);
+	if (i - 1 >= 0 &&
+		board[i - 1][j + direction] != Empty &&
+		cellColor(board[i - 1][j + direction]) != pawnColor)
+		setMove(moves, i, j, i - 1, j + direction);
+	moves |= enPassantMoves(i, j);
 
 	return moves;
 }

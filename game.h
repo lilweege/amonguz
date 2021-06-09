@@ -33,13 +33,8 @@ enum Cell : uint8_t {
 	BlackPawn		= Black | Pawn,
 };
 
-static Cell cellPiece(Cell cell) {
-	return Cell{(uint8_t)((cell & 0b00111))};
-}
-
-static bool cellIsWhite(Cell cell) {
-	return cell & White;
-}
+static Cell cellType(Cell cell) { return Cell{(uint8_t)(cell & 0b00111)}; }
+static Cell cellColor(Cell cell) { return Cell{(uint8_t)(cell & 0b11000)}; }
 
 class Game {
 private:
@@ -49,7 +44,9 @@ private:
 	int fullmoveCounter = 0; // this is not really useful for anything
 	int halfmoveClock = 0; // fifty-move rule
 	bool isWhiteTurn = true;
-	olc::vi2d lastMove; // for en passant
+
+	olc::vi2d lastMoveFr;
+	olc::vi2d lastMoveTo;
 	
 	// there has to be a better way to do this
 	std::unordered_multiset<std::string> previousBoards; // 3rd repetition rule
@@ -66,6 +63,20 @@ private:
 	static Cell pieceFromChar(char c);
 	int addBoardToHistory(); // add current board to previousBoards, returns count
 
+	bool setMove(uint64_t& moves, int i, int j, int x, int y) const;
+	uint64_t kingMoves(int i, int j) const;
+	uint64_t queenMoves(int i, int j) const;
+	uint64_t bishopMoves(int i, int j) const;
+	uint64_t knightMoves(int i, int j) const;
+	uint64_t rookMoves(int i, int j) const;
+	uint64_t pawnMoves(int i, int j) const;
+	uint64_t (Game::*pieceMoves[6])(int i, int j) const = { &kingMoves, &queenMoves, &bishopMoves, &knightMoves, &rookMoves, &pawnMoves };
+	uint64_t enPassantMoves(int i, int j) const;
+	uint64_t castleMoves(int i, int j) const;
+	
+	static bool boardGetBit(uint64_t board, int x, int y) { return (board >> (x * 8 + y)) & 1; }
+	static void boardSetBit(uint64_t& board, int x, int y) { board |= (1ULL << (x * 8 + y)); }
+	
 public:
 	void performMove(olc::vi2d fr, olc::vi2d to);
 	
