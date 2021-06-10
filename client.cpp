@@ -192,7 +192,7 @@ private:
 				olc::vi2d cellPos = { i, j };
 				if (promotionPrompt) {
 					if (cellPos == promotionCellPos) {
-						drawPiece(i * scale, j * scale, Cell{uint8_t((game.getWhiteTurn() ? White : Black) | promotionPiece)});
+						drawPiece(i * scale, j * scale, Cell{uint8_t(game.getPlayerToMove() | promotionPiece)});
 						continue;
 					}
 					if (cellPos == selectedCellPos)
@@ -214,7 +214,7 @@ private:
 
 	void drawSidebar() {
 		{
-			bool isWhiteTurn = game.getWhiteTurn();
+			bool isWhiteTurn = game.getPlayerToMove() == White;
 			olc::Pixel turnPromptColor = isWhiteTurn ? olc::WHITE : olc::BLACK;
 			// std::string turnPromptText = isWhiteTurn ? "White Turn" : "Black Turn";
 			std::string turnPromptText = isWhiteTurn == isPlayerWhite ? "Your Turn" : "Waiting For\nOpponent...";
@@ -241,7 +241,7 @@ private:
 		if (promotionPrompt) {
 			promotionPiece = Pawn;
 			for (uint8_t pieceType = Queen; pieceType <= Rook; ++pieceType) {
-				Cell coloredPiece = Cell{(uint8_t)((game.getWhiteTurn() ? White : Black) | pieceType)};
+				Cell piece = Cell{uint8_t(game.getPlayerToMove() | pieceType)};
 				int sx = 8 * scale + (ScreenWidth() - 8 * scale - scale) / 2,
 					sy = (pieceType - King) * scale,
 					mx = GetMouseX(),
@@ -251,16 +251,16 @@ private:
 					SetPixelMode(olc::Pixel::ALPHA);
 					FillRect({sx, sy}, {scale, scale}, validColor);
 					SetPixelMode(olc::Pixel::NORMAL);
-					promotionPiece = coloredPiece;
+					promotionPiece = piece;
 					if (GetMouse(0).bReleased) {
 						promotionPrompt = false;
-						game.setCell(selectedCellPos, promotionPiece);
+						game.setPromotionPiece(Cell{pieceType});
 						game.performMove(selectedCellPos, promotionCellPos);
 						// break;
 					}
 				}
 
-				drawPiece(sx, sy, coloredPiece);
+				drawPiece(sx, sy, piece);
 			}
 		}
 	}

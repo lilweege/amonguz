@@ -3,6 +3,7 @@
 // https://www.chessprogramming.org/
 // https://chess.org/rules
 
+// init
 Cell Game::pieceFromChar(char pieceChar) {
 	switch (pieceChar) {
 		case 'K': return WhiteKing;
@@ -53,7 +54,7 @@ void Game::fromFEN(const std::string& sequence) {
 	// state conditions
 	// field 2: active color
 	// <Side to move> ::= {'w' | 'b'}
-	isWhiteTurn = sequence[idx] == 'w';
+	playerToMove = sequence[idx] == 'w' ? White : Black;
 	idx += 2;
 	
 	// field 3: castling rights
@@ -124,14 +125,22 @@ void Game::fromFEN(const std::string& sequence) {
 	fullmoveCounter = atoi(sequence.substr(idx).c_str());
 }
 
-int Game::addBoardToHistory() {
+
+
+// 
+void Game::computePosition() {
+	// precompute and cache stuff
+		// piece available moves
+		// piece 'attack paths'
+		// king cell positions
+
 	// faux FEN code as string for hashable type
 	std::string currentBoardHash;
 	currentBoardHash.reserve(64 + 5); // nice
 	for (int i = 0; i < 8; ++i)
 		for (int j = 0; j < 8; ++j)
 			currentBoardHash.push_back(board[i][j]);
-	currentBoardHash.push_back(isWhiteTurn);
+	currentBoardHash.push_back(playerToMove);
 	currentBoardHash.push_back(BQsCanCastle);
 	currentBoardHash.push_back(BKsCanCastle);
 	currentBoardHash.push_back(WQsCanCastle);
@@ -141,16 +150,19 @@ int Game::addBoardToHistory() {
 	// however there may be some other weird edge cases
 
 	previousBoards.insert(currentBoardHash);
-	return previousBoards.count(currentBoardHash);
+	lastBoardCount = previousBoards.count(currentBoardHash);
 }
+
 
 void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 	++halfmoveClock;
 	if (board[to.x][to.y] != Empty)
 		halfmoveClock = 0;
-	if (!isWhiteTurn)
+	if (playerToMove == Black)
 		++fullmoveCounter;
 	
+	// TODO: refactor/organize
+	// handle specific cases
 	Cell piece = board[fr.x][fr.y];
 	if (cellType(piece) == Pawn) {
 		halfmoveClock = 0;
@@ -158,10 +170,16 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 			if (to.y == 2 && lastMoveFr.y == 1 && lastMoveTo.y == 3 && board[to.x][3] == BlackPawn) {
 				board[to.x][3] = Empty;
 			}
+			else if (to.y == 0) {
+				board[fr.x][fr.y] = promotionPiece;
+			}
 		}
 		else {
 			if (to.y == 5 && lastMoveFr.y == 6 && lastMoveTo.y == 4 && board[to.x][4] == WhitePawn) {
 				board[to.x][4] = Empty;
+			}
+			else if (to.y == 7) {
+				board[fr.x][fr.y] = promotionPiece;
 			}
 		}
 	}
@@ -210,44 +228,44 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 		}
 	}
 
+	// do the move (edge cases excluded)
 	board[to.x][to.y] = board[fr.x][fr.y];
 	board[fr.x][fr.y] = Empty;
 
 
 	// TODO: online stuff
+	// only after everything else actually works
+
+
 	lastMoveFr = fr;
 	lastMoveTo = to;
-	isWhiteTurn ^= true;
-	
-	// fifty-move rule
+	playerToMove = playerToMove == White ? Black : White;
+	computePosition(); // store results in class variables for use below
+
+	// TODO: check and checkmate position
+	// TODO: insuficcient material draw
+	// TODO: stalemate position draw
+
+	// fifty-move rule draw
 	if (halfmoveClock >= 100) {
-		// TODO: end game draw
-		// std::cout << "DRAW\n";
+		// TODO:
 	}
 	
-	// 3rd repetition rule
-	if (addBoardToHistory() >= 3) {
-		// TODO: end game draw
-		// std::cout << "DRAW\n";
+	// 3rd repetition rule draw
+	if (lastBoardCount >= 3) {
+		// TODO:
 	}
-
-	// TODO: insuficcient material
-	// TODO: stalemate
-
-	// TODO: checkmate
 }
 
-// TODO: castling
-// TODO: king in check move rules
-// FIXME: test and catch all edge cases (there will be many)
 uint64_t Game::getLegalMoves(int i, int j) const {
 	Cell piece = board[i][j];
 	// assert(piece != Empty);
-	if (cellColor(piece) != (isWhiteTurn ? White : Black))
+	if (cellColor(piece) != playerToMove)
 		return 0ULL; // not your turn
+	// TODO: invalidate king in check moves
+	// FIXME: test and catch all edge cases (there will be many)
 	return (this->*(pieceMoves[cellType(piece) - King]))(i, j);
 }
-
 
 // returns true if sliding path should end
 // (i, j) -> (x, y)
@@ -262,6 +280,7 @@ bool Game::setMove(uint64_t& moves, int i, int j, int x, int y) const {
 	return true;
 }
 
+// pseudo-legal move generation
 uint64_t Game::bishopMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
 	for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y)
@@ -274,7 +293,6 @@ uint64_t Game::bishopMoves(int i, int j) const {
 		if (setMove(moves, i, j, x, y)) break;
 	return moves;
 }
-
 uint64_t Game::rookMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
 	for (int x = i + 1; x < 8; ++x)
@@ -287,6 +305,9 @@ uint64_t Game::rookMoves(int i, int j) const {
 		if (setMove(moves, i, j, i, y)) break;
 	return moves;
 }
+uint64_t Game::queenMoves(int i, int j) const {
+	return bishopMoves(i, j) | rookMoves(i, j);
+}
 
 uint64_t Game::knightMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
@@ -298,13 +319,6 @@ uint64_t Game::knightMoves(int i, int j) const {
 			0 <= j + y && j + y < 8)
 			setMove(moves, i, j, i + x, j + y);
 	}
-	return moves;
-}
-
-uint64_t Game::queenMoves(int i, int j) const {
-	uint64_t moves = 0ULL;
-	moves |= bishopMoves(i, j);
-	moves |= rookMoves(i, j);
 	return moves;
 }
 
@@ -343,7 +357,6 @@ uint64_t Game::castleMoves(int i, int j) const {
 	}
 	return moves;
 }
-
 uint64_t Game::kingMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
 	for (int x = i - 1; x <= i + 1; ++x)
@@ -372,7 +385,6 @@ uint64_t Game::enPassantMoves(int i, int j) const {
 	}
 	return moves;
 }
-
 uint64_t Game::pawnMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
 	Cell pawnColor = cellColor(board[i][j]);
@@ -397,6 +409,6 @@ uint64_t Game::pawnMoves(int i, int j) const {
 		cellColor(board[i - 1][j + direction]) != pawnColor)
 		setMove(moves, i, j, i - 1, j + direction);
 	moves |= enPassantMoves(i, j);
-
 	return moves;
 }
+
