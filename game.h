@@ -1,5 +1,7 @@
 #pragma once
 
+// olc::vi2d is used as a drop in replacement for std::pair of int, int
+// for a standalone application, but here use vi2d for ease of interfacing
 #include "olcPixelGameEngine.h"
 #include <array>
 #include <unordered_set>
@@ -33,14 +35,36 @@ enum Cell : uint8_t {
 	BlackPawn		= Black | Pawn,
 };
 
-static Cell cellType(Cell cell) { return Cell{uint8_t(cell & 0b00111)}; }
+static Cell cellType (Cell cell) { return Cell{uint8_t(cell & 0b00111)}; }
 static Cell cellColor(Cell cell) { return Cell{uint8_t(cell & 0b11000)}; }
+
+struct Path {
+	olc::vi2d source;
+	// for small vector sizes, linear search faster than hashtable lookup (probably)
+	std::vector<std::pair<int, olc::vi2d>> line;
+
+	int numTargets = 0;
+	olc::vi2d firstTarget;
+	olc::vi2d secondTarget; // sliding piece pins
+	olc::vi2d thirdTarget; // en passant double reveal edge case ?
+};
 
 class Game {
 private:
+	static constexpr int knightOffsets[8] = {-2, -2, -1,  1,  2,  2,  1, -1};
+
 	std::array<std::array<Cell, 8>, 8> board;
-	std::array<std::array<Cell, 8>, 8> tempBoard; // for king check
-	Cell promotionPiece;
+	std::unordered_multiset<std::string> previousBoards; // 3rd repetition rule
+	int lastBoardCount;
+	std::array<std::array<uint64_t, 8>, 8> legalMoves; // player
+
+	std::array<std::array<std::vector<Path*>, 8>, 8> attackers; // opponents
+	std::unordered_set<Path*> kingXrayers;
+	std::array<std::array<std::vector<Path>, 8>, 8> attackingPaths; // opponent
+
+	olc::vi2d kingCellPos;
+	bool kingInCheck = false;
+	bool checkmate = false;
 
 	int fullmoveCounter = 0; // this is not really useful for anything
 	int halfmoveClock = 0; // fifty-move rule
@@ -48,10 +72,7 @@ private:
 
 	olc::vi2d lastMoveFr;
 	olc::vi2d lastMoveTo;
-	
-	std::unordered_multiset<std::string> previousBoards; // 3rd repetition rule
-	int lastBoardCount;
-
+	Cell promotionPiece;
 	bool
 		WKsCanCastle = true,
 		WQsCanCastle = true,
@@ -61,12 +82,11 @@ private:
 
 private:
 	static Cell pieceFromChar(char c);
-	static bool boardGetBit(uint64_t board, int x, int y) { return (board >> (x * 8 + y)) & 1; }
-	static void boardSetBit(uint64_t& board, int x, int y) { board |= (1ULL << (x * 8 + y)); }
 
 	void fromFEN(const std::string& sequence);
 	void computePosition();
 	bool setMove(uint64_t& moves, int i, int j, int x, int y) const;
+	bool isBlockingCheck(int i, int j) const;
 	uint64_t kingMoves(int i, int j) const;
 	uint64_t queenMoves(int i, int j) const;
 	uint64_t bishopMoves(int i, int j) const;
@@ -78,9 +98,14 @@ private:
 	uint64_t castleMoves(int i, int j) const;
 
 public:
+	static bool boardGetBit(uint64_t board, int x, int y) { return (board >> (x * 8 + y)) & 1; }
+	static void boardSetBit(uint64_t& board, int x, int y) { board |= (1ULL << (x * 8 + y)); }
+	static void boardUnsetBit(uint64_t& board, int x, int y) { board &= ~(1ULL << (x * 8 + y)); }
+	// static void boardToggleBit(uint64_t& board, int x, int y) { board ^= (1ULL << (x * 8 + y)); }
+
 	void setPromotionPiece(Cell type) { promotionPiece = Cell{uint8_t(type | playerToMove)}; }
 	void performMove(olc::vi2d fr, olc::vi2d to);
-	uint64_t getLegalMoves(int i, int j) const;
+	uint64_t getLegalMoves(int i, int j) const { return legalMoves[i][j]; }
 	uint64_t getLegalMoves(olc::vi2d pos) const { return getLegalMoves(pos.x, pos.y); }
 	Cell getCell(int i, int j) const { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) const { return getCell(pos.x, pos.y); }

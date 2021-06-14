@@ -288,12 +288,12 @@ private:
 			SetPixelMode(olc::Pixel::ALPHA);
 			for (int i = 0; i < 8; ++i)
 				for (int j = 0; j < 8; ++j)
-					if ((validMoves >> (i * 8 + j)) & 1)
+					if (Game::boardGetBit(validMoves, i, j))
 						drawCell({i, j}, validColor);
 			SetPixelMode(olc::Pixel::NORMAL);
 			if (selectedCell != Empty) {
 				if (GetMouse(0).bReleased && !promotionPrompt) {
-					bool isLegal = (validMoves >> (currentCellPos.x * 8 + currentCellPos.y)) & 1;
+					bool isLegal = Game::boardGetBit(validMoves, currentCellPos.x, currentCellPos.y);
 					if (isLegal) {
 						if (cellType(selectedCell) == Pawn &&
 							currentCellPos.y == (cellColor(selectedCell) == White ? 0 : 7)) {
