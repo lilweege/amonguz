@@ -626,14 +626,16 @@ uint64_t Game::castleMoves(int i, int j) const {
 	if (cellColor(board[i][j]) == White) {
 		if (WKsCanCastle) {
 			if (board[5][7] == Empty && numAttackers[5][7] == 0 &&
-				board[6][7] == Empty && numAttackers[6][7] == 0) {
+				board[6][7] == Empty && numAttackers[6][7] == 0 &&
+				board[7][7] == WhiteRook) {
 				setMove(moves, i, j, 6, 7);
 			}
 		}
 		if (WQsCanCastle) {
 			if (board[1][7] == Empty &&
 				board[2][7] == Empty && numAttackers[2][7] == 0 &&
-				board[3][7] == Empty && numAttackers[3][7] == 0) {
+				board[3][7] == Empty && numAttackers[3][7] == 0 &&
+				board[0][7] == WhiteRook) {
 				setMove(moves, i, j, 2, 7);
 			}
 		}
@@ -641,14 +643,16 @@ uint64_t Game::castleMoves(int i, int j) const {
 	else {
 		if (BKsCanCastle) {
 			if (board[5][0] == Empty && numAttackers[5][0] == 0 &&
-				board[6][0] == Empty && numAttackers[6][0] == 0) {
+				board[6][0] == Empty && numAttackers[6][0] == 0 &&
+				board[7][0] == BlackRook) {
 				setMove(moves, i, j, 6, 0);
 			}
 		}
 		if (BQsCanCastle) {
 			if (board[1][0] == Empty &&
 				board[2][0] == Empty && numAttackers[2][0] == 0 &&
-				board[3][0] == Empty && numAttackers[3][0] == 0) {
+				board[3][0] == Empty && numAttackers[3][0] == 0 &&
+				board[0][0] == BlackRook) {
 				setMove(moves, i, j, 2, 0);
 			}
 		}
