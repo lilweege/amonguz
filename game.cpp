@@ -126,6 +126,142 @@ void Game::fromFEN(const std::string& sequence) {
 }
 
 
+void Game::addPaths(int i, int j) {
+	auto newPath = [&](int i, int j) {
+		attackingPaths[i][j][++numAttackingPaths[i][j]] = Path{};
+		Path& path = attackingPaths[i][j][numAttackingPaths[i][j]];
+		path.source = {i, j};
+	};
+
+	auto tryAttack = [&](int i, int j, int x, int y) -> bool {
+		Cell piece = board[x][y];
+		Path& path = attackingPaths[i][j][numAttackingPaths[i][j]];
+		if (piece == Empty) {
+			if (path.numTargets == 0)
+				// attackers[x][y].push_back(&path);
+				attackers[x][y][numAttackers[x][y]++] = &path;
+		}
+		else { // piece exist
+			++path.numTargets;
+			if (path.numTargets == 1) {
+				path.firstTarget = {x, y};
+				// attackers[x][y].push_back(&path);
+				attackers[x][y][numAttackers[x][y]++] = &path;
+			}
+			else if (path.numTargets == 2) {
+				path.secondTarget = {x, y};
+			}
+			else {
+				path.thirdTarget = {x, y};
+			}
+			if (kingCellPos.x == x && kingCellPos.y == y)
+				kingXrayers.insert(&path);
+				// kingXrayers.emplace(olc::vi2d{path.firstTarget.x, path.firstTarget.y}, &path);
+				// kingXrayers[path.firstTarget.x][path.firstTarget.y] = &path;
+		}
+		path.line.emplace_back(path.numTargets, olc::vi2d{x, y});
+		return path.numTargets >= 3;
+	};
+
+	Cell piece = board[i][j];
+	switch (cellType(piece)) {
+		case Queen: {
+			newPath(i, j);
+			for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i + 1; x < 8; ++x)
+				if (tryAttack(i, j, x, j)) break;
+			newPath(i, j);
+			for (int x = i - 1; x >= 0; --x)
+				if (tryAttack(i, j, x, j)) break;
+			newPath(i, j);
+			for (int y = j + 1; y < 8; ++y)
+				if (tryAttack(i, j, i, y)) break;
+			newPath(i, j);
+			for (int y = j - 1; y >= 0; --y)
+				if (tryAttack(i, j, i, y)) break;
+			break;
+		}
+		case Bishop: {
+			newPath(i, j);
+			for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y)
+				if (tryAttack(i, j, x, y)) break;
+			newPath(i, j);
+			for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y)
+				if (tryAttack(i, j, x, y)) break;
+			break;
+		}
+		case Rook: {
+			newPath(i, j);
+			for (int x = i + 1; x < 8; ++x)
+				if (tryAttack(i, j, x, j)) break;
+			newPath(i, j);
+			for (int x = i - 1; x >= 0; --x)
+				if (tryAttack(i, j, x, j)) break;
+			newPath(i, j);
+			for (int y = j + 1; y < 8; ++y)
+				if (tryAttack(i, j, i, y)) break;
+			newPath(i, j);
+			for (int y = j - 1; y >= 0; --y)
+				if (tryAttack(i, j, i, y)) break;
+			break;
+		}
+		case Pawn: {
+			int direction = cellColor(piece) == White ? -1 : 1;
+			if (i - 1 >= 0) {
+				newPath(i, j);
+				tryAttack(i, j, i - 1, j + direction);
+			}
+			if (i + 1 <  8) {
+				newPath(i, j);
+				tryAttack(i, j, i + 1, j + direction);
+			}
+			break;
+		}
+		case Knight: {
+			for (int idx = 0; idx < 8; ++idx) {
+				int x = i + knightOffsets[idx],
+					y = j + knightOffsets[(idx + 2) % 8];
+				if (0 <= x && x < 8 &&
+					0 <= y && y < 8) {
+					newPath(i, j);
+					tryAttack(i, j, x, y);
+				}
+			}
+			break;
+		}
+		case King: {
+			for (int x = i - 1; x <= i + 1; ++x)
+				for (int y = j - 1; y <= j + 1; ++y) {
+					if (i != x && j == y)
+						continue;
+					if (0 <= x && x < 8 &&
+						0 <= y && y < 8) {
+						newPath(i, j);
+						tryAttack(i, j, x, y);
+					}
+				}
+			break;
+		}
+		default: break;
+	}
+}
 
 void Game::computePosition() {
 	// faux FEN code as string for hashable type
@@ -147,6 +283,7 @@ void Game::computePosition() {
 	lastBoardCount = previousBoards.count(currentBoardHash);
 
 	numLegalMoves = 0;
+	extraMoves = 0;
 
 	// TODO: only update as much as necessary, save much computation
 
@@ -154,7 +291,9 @@ void Game::computePosition() {
 	kingXrayers.clear();
 	for (int i = 0; i < 8; ++i)
 		for (int j = 0; j < 8; ++j) {
-			attackers[i][j].clear();
+			numAttackers[i][j] = 0;
+			numAttackingPaths[i][j] = 0;
+			// attackers[i][j].clear();
 			// kingXrayers[i][j] = nullptr;
 			if (board[i][j] == kingPiece)
 				kingCellPos = {i, j};
@@ -165,105 +304,15 @@ void Game::computePosition() {
 		for (int j = 0; j < 8; ++j) {
 			Cell piece = board[i][j];
 			
-			// vector of vector of pairs
-			auto& piecePaths = attackingPaths[i][j];
-			piecePaths.clear();
-			
-			
 			if (piece != Empty && cellColor(piece) != playerToMove) {
 				// returns true if sliding path should end
-				auto tryAttack = [&](Path& path, int i, int j, int x, int y) -> bool {
-					Cell piece = board[x][y];
-					if (piece == Empty) {
-						if (path.numTargets == 0)
-							attackers[x][y].push_back(&path);
-					}
-					else { // piece exist
-						++path.numTargets;
-						if (path.numTargets == 1) {
-							path.firstTarget = {x, y};
-							attackers[x][y].push_back(&path);
-						}
-						else if (path.numTargets == 2) {
-							path.secondTarget = {x, y};
-						}
-						else {
-							path.thirdTarget = {x, y};
-						}
-						if (kingCellPos.x == x && kingCellPos.y == y)
-							kingXrayers.insert(&path);
-							// kingXrayers.emplace(olc::vi2d{path.firstTarget.x, path.firstTarget.y}, &path);
-							// kingXrayers[path.firstTarget.x][path.firstTarget.y] = &path;
-					}
-					path.line.emplace_back(path.numTargets, olc::vi2d{x, y});
-					return path.numTargets >= 3;
-				};
-
-				// compute tryAttack path for sliding pieces (pins)
-				// sliding pieces (queen, bishop, rook)
-				// TODO: use switch statement
-				if (cellType(piece) == Bishop ||
-					cellType(piece) == Rook ||
-					cellType(piece) == Queen) {
-					
-					if (cellType(piece) == Bishop || cellType(piece) == Queen) {
-						piecePaths.resize(4, {olc::vi2d{i, j}});
-						for (int x = i + 1, y = j + 1; x < 8 && y < 8; ++x, ++y)
-							if (tryAttack(piecePaths[piecePaths.size() - 4], i, j, x, y)) break;
-						for (int x = i + 1, y = j - 1; x < 8 && y >= 0; ++x, --y)
-							if (tryAttack(piecePaths[piecePaths.size() - 3], i, j, x, y)) break;
-						for (int x = i - 1, y = j + 1; x >= 0 && y < 8; --x, ++y)
-							if (tryAttack(piecePaths[piecePaths.size() - 2], i, j, x, y)) break;
-						for (int x = i - 1, y = j - 1; x >= 0 && y >= 0; --x, --y)
-							if (tryAttack(piecePaths[piecePaths.size() - 1], i, j, x, y)) break;
-					}
-					if (cellType(piece) == Rook || cellType(piece) == Queen) {
-						piecePaths.resize(piecePaths.size() + 4, {olc::vi2d{i, j}});
-						for (int x = i + 1; x < 8; ++x)
-							if (tryAttack(piecePaths[piecePaths.size() - 4], i, j, x, j)) break;
-						for (int x = i - 1; x >= 0; --x)
-							if (tryAttack(piecePaths[piecePaths.size() - 3], i, j, x, j)) break;
-						for (int y = j + 1; y < 8; ++y)
-							if (tryAttack(piecePaths[piecePaths.size() - 2], i, j, i, y)) break;
-						for (int y = j - 1; y >= 0; --y)
-							if (tryAttack(piecePaths[piecePaths.size() - 1], i, j, i, y)) break;
-					}
-				}
-				else if (cellType(piece) == Pawn) {
-					piecePaths.resize(2, {olc::vi2d{i, j}});
-					int direction = cellColor(piece) == White ? -1 : 1;
-					if (i - 1 >= 0) tryAttack(piecePaths[0], i, j, i - 1, j + direction);
-					if (i + 1 < 8)  tryAttack(piecePaths[1], i, j, i + 1, j + direction);
-				}
-				else if (cellType(piece) == Knight) {
-					piecePaths.resize(8, {olc::vi2d{i, j}});
-					for (int idx = 0; idx < 8; ++idx) {
-						int x = i + knightOffsets[idx],
-							y = j + knightOffsets[(idx + 2) % 8];
-						if (0 <= x && x < 8 &&
-							0 <= y && y < 8)
-							tryAttack(piecePaths[idx], i, j, x, y);
-					}
-				}
-				else if (cellType(piece) == King) {
-					piecePaths.resize(8, {olc::vi2d{i, j}});
-					int idx = 0;
-					for (int x = i - 1; x <= i + 1; ++x)
-						for (int y = j - 1; y <= j + 1; ++y) {
-							if (i != x && j == y)
-								continue;
-							if (0 <= x && x < 8 &&
-								0 <= y && y < 8)
-								tryAttack(piecePaths[idx], i, j, x, y);
-							++idx;
-						}
-				}
+				addPaths(i, j);
 			}
 		}
 
 	int kx = kingCellPos.x,
 		ky = kingCellPos.y;
-	kingInCheck = !attackers[kx][ky].empty();
+	kingInCheck = numAttackers[kx][ky];
 	checkmate = false;
 	if (kingInCheck) {
 		checkmate = true;
@@ -273,7 +322,7 @@ void Game::computePosition() {
 					continue;
 				if (0 <= x && x < 8 &&
 					0 <= y && y < 8)
-					if (attackers[x][y].empty()) {
+					if (numAttackers[x][y] == 0) {
 						checkmate = false;
 						break;
 					}
@@ -282,7 +331,7 @@ void Game::computePosition() {
 				break;
 		}
 	}
-	if (checkmate && attackers[kx][ky].size() >= 2) {
+	if (checkmate && numAttackers[kx][ky] >= 2) {
 		// unsure if this is correct in all cases
 		return;
 	}
@@ -315,6 +364,13 @@ void Game::computePosition() {
 				legalMoves[i][j] = 0ULL;
 			}
 		}
+	// for (int j = 0; j < 8; ++j) {
+	// 	for (int i = 0; i < 8; ++i)
+	// 		std::cout << int(numAttackers[i][j]);
+	// 	std::cout << "\n";
+	// }
+
+	
 }
 
 
@@ -503,6 +559,11 @@ bool Game::setMove(uint64_t& moves, int i, int j, int x, int y) const {
 		if (allowed) {
 			boardSetBit(moves, x, y);
 			allLegalMoves[numLegalMoves++] = {{i, j}, {x, y}};
+			
+			if (cellType(board[i][j]) == Pawn &&
+				y == (getPlayerToMove() == White ? 0 : 7)) {
+				extraMoves += 3;
+			}
 		}
 		return false;
 	}
@@ -510,6 +571,11 @@ bool Game::setMove(uint64_t& moves, int i, int j, int x, int y) const {
 		if (allowed) {
 			boardSetBit(moves, x, y);
 			allLegalMoves[numLegalMoves++] = {{i, j}, {x, y}};
+
+			if (cellType(board[i][j]) == Pawn &&
+				y == (getPlayerToMove() == White ? 0 : 7)) {
+				extraMoves += 3;
+			}
 		}
 	return true;
 }
@@ -559,30 +625,30 @@ uint64_t Game::castleMoves(int i, int j) const {
 	uint64_t moves = 0ULL;
 	if (cellColor(board[i][j]) == White) {
 		if (WKsCanCastle) {
-			if (board[5][7] == Empty && attackers[5][7].empty() &&
-				board[6][7] == Empty && attackers[6][7].empty()) {
+			if (board[5][7] == Empty && numAttackers[5][7] == 0 &&
+				board[6][7] == Empty && numAttackers[6][7] == 0) {
 				setMove(moves, i, j, 6, 7);
 			}
 		}
 		if (WQsCanCastle) {
 			if (board[1][7] == Empty &&
-				board[2][7] == Empty && attackers[2][7].empty() &&
-				board[3][7] == Empty && attackers[3][7].empty()) {
+				board[2][7] == Empty && numAttackers[2][7] == 0 &&
+				board[3][7] == Empty && numAttackers[3][7] == 0) {
 				setMove(moves, i, j, 2, 7);
 			}
 		}
 	}
 	else {
 		if (BKsCanCastle) {
-			if (board[5][0] == Empty && attackers[5][0].empty() &&
-				board[6][0] == Empty && attackers[6][0].empty()) {
+			if (board[5][0] == Empty && numAttackers[5][0] == 0 &&
+				board[6][0] == Empty && numAttackers[6][0] == 0) {
 				setMove(moves, i, j, 6, 0);
 			}
 		}
 		if (BQsCanCastle) {
 			if (board[1][0] == Empty &&
-				board[2][0] == Empty && attackers[2][0].empty() &&
-				board[3][0] == Empty && attackers[3][0].empty()) {
+				board[2][0] == Empty && numAttackers[2][0] == 0 &&
+				board[3][0] == Empty && numAttackers[3][0] == 0) {
 				setMove(moves, i, j, 2, 0);
 			}
 		}
@@ -598,7 +664,8 @@ uint64_t Game::kingMoves(int i, int j) const {
 			if (0 <= x && x < 8 &&
 				0 <= y && y < 8) {
 				if (kingInCheck) {
-					for (const Path* path : attackers[i][j]) {
+					for (int idx = 0; idx < numAttackers[i][j]; ++idx) {
+						Path* path = attackers[i][j][idx];
 						if (path->firstTarget != kingCellPos)
 							continue;
 						for (const auto& [_, cellPos] : path->line)
@@ -607,7 +674,7 @@ uint64_t Game::kingMoves(int i, int j) const {
 					}
 
 				}
-				if (attackers[x][y].empty())
+				if (numAttackers[x][y] == 0)
 					setMove(moves, i, j, x, y);
 				invalid:;
 			}

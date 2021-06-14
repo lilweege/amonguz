@@ -48,8 +48,8 @@ private:
 	olc::vi2d cellSize;
 
 	int scale;
-	// Game game{"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 0"};
-	Game game;
+	Game game{"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 0"};
+	// Game game;
 	bool isPlayerWhite = true;
 	// Color playerColor = White;
 	bool promotionPrompt = false;
@@ -365,8 +365,9 @@ public:
 };
 
 int main() {
-	GameTest test;
-	test.run();
+	// GameTest test;
+	// test.run();
+	// return 0;
 
 	std::string SERVER_ADDR;
 	uint16_t SERVER_PORT;

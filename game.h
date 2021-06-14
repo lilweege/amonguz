@@ -42,7 +42,7 @@ static Cell cellColor(Cell cell) { return Cell{uint8_t(cell & 0b11000)}; }
 struct Path {
 	olc::vi2d source;
 	// for small vector sizes, linear search faster than hashtable lookup (probably)
-	std::vector<std::pair<int, olc::vi2d>> line;
+	std::vector<std::pair<uint8_t, olc::vi2d>> line;
 
 	int numTargets = 0;
 	olc::vi2d firstTarget;
@@ -59,11 +59,15 @@ private:
 	int lastBoardCount;
 	std::array<std::array<uint64_t, 8>, 8> legalMoves; // player
 
-	std::array<std::array<std::vector<Path*>, 8>, 8> attackers; // opponents
+	// std::array<std::array<std::array<Path*, 2>, 8>, 8> attackers; // opponents
+	std::array<std::array<std::array<Path*, 14>, 8>, 8> attackers; // opponents
 	std::unordered_set<Path*> kingXrayers; // first target, path
 	// std::map<olc::vi2d, Path*> kingXrayers; // first target, path
 	// std::array<std::array<Path*, 8>, 8> kingXrayers;
-	std::array<std::array<std::vector<Path>, 8>, 8> attackingPaths; // opponent
+	// std::array<std::array<std::array<Path, 8>, 8>, 8> attackingPaths; // opponent
+	std::array<std::array<std::array<Path, 14>, 8>, 8> attackingPaths; // opponent
+	std::array<std::array<uint8_t, 8>, 8> numAttackers;
+	std::array<std::array<uint8_t, 8>, 8> numAttackingPaths;
 
 	olc::vi2d kingCellPos;
 	bool kingInCheck = false;
@@ -87,6 +91,7 @@ private:
 	static Cell pieceFromChar(char c);
 
 	void fromFEN(const std::string& sequence);
+	void addPaths(int i, int j);
 	void computePosition();
 	bool setMove(uint64_t& moves, int i, int j, int x, int y) const;
 	Path* isBlockingCheck(int i, int j) const;
@@ -113,9 +118,11 @@ public:
 	Cell getCell(int i, int j) const { return board[i][j]; }
 	Cell getCell(olc::vi2d pos) const { return getCell(pos.x, pos.y); }
 	Cell getPlayerToMove() const { return playerToMove; }
+	bool isCheckmate() const { return checkmate; }
 
 	mutable std::array<std::pair<olc::vi2d, olc::vi2d>, 256> allLegalMoves;
 	mutable int numLegalMoves = 0;
+	mutable int extraMoves = 0;
 
 	Game(const std::string& startingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
 		fromFEN(startingPosition);

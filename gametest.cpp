@@ -1,42 +1,54 @@
 #include "game.h"
+#include <chrono>
 
 struct GameTest {
 	Game game;
 
-	uint64_t lastNodes = 0;
-	uint64_t nodes = 0;
-	uint64_t perft(int depth) {
+	uint64_t perft(int depth /* >= 1*/) {
+		uint64_t nodes = 0ULL;
+		if (game.isCheckmate()) // works without this ??
+			return uint64_t(game.numLegalMoves + game.extraMoves);
 
-		if (depth == 0) {
-			if (nodes - lastNodes > 10000ULL) {
-				std::cout << nodes << std::endl;
-				lastNodes = nodes;
-			}
-			return 1ULL;
-		}
+		if (depth == 1)
+			return uint64_t(game.numLegalMoves + game.extraMoves);
 
-		// rip ram
-		uint64_t num = 0;
 		for (int i = 0; i < game.numLegalMoves; ++i) {
 			const auto& [fr, to] = game.allLegalMoves[i];
 			Game copy = game;
-			game.performMove(fr, to);
-			num += perft(depth - 1);
-			game = copy;
+			if (game.getCell(fr) == (game.getPlayerToMove() | Pawn) &&
+				to.y == (game.getPlayerToMove() == White ? 0 : 7)) {
+				for (uint8_t pieceType = Queen; pieceType <= Rook; ++pieceType) {
+					// game.extraMoves -= 3; // ??????
+					game.setPromotionPiece(Cell{pieceType});
+					game.performMove(fr, to);
+					nodes += perft(depth - 1);
+					game = copy;
+				}
+			}
+			else {
+				game.performMove(fr, to);
+				nodes += perft(depth - 1);
+				game = copy;
+			}
 		}
-		return num;
+		return nodes;
 	}
 
-	void test(int depth, const std::string& fen = "") {
-		for (int i = 0; i < depth; ++i) {
-			nodes = 0;
+	void test(int maxDepth, const std::string& fen = "") {
+		for (int i = 1; i <= maxDepth; ++i) {
 			game = fen == "" ? Game{} : Game{fen};
-			std::cout << "depth " << i << ": " << perft(i) << std::endl;
+
+			auto start = std::chrono::high_resolution_clock::now();
+			uint64_t result = perft(i);
+			auto stop = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+
+			std::cout << "depth " << i << ": " << result << "\t\t in " << (duration.count() / 1000000.0f) << " second\n";
 		}
 	}
 
 	void run() {
-		test(5, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 0");
-		test(6);
+		// test(5);
+		test(4, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 0");
 	}
 };
