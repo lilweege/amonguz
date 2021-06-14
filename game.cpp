@@ -146,6 +146,8 @@ void Game::computePosition() {
 	previousBoards.insert(currentBoardHash);
 	lastBoardCount = previousBoards.count(currentBoardHash);
 
+	numLegalMoves = 0;
+
 	// TODO: only update as much as necessary, save much computation
 
 	Cell kingPiece = Cell{uint8_t(playerToMove | King)};
@@ -153,6 +155,7 @@ void Game::computePosition() {
 	for (int i = 0; i < 8; ++i)
 		for (int j = 0; j < 8; ++j) {
 			attackers[i][j].clear();
+			// kingXrayers[i][j] = nullptr;
 			if (board[i][j] == kingPiece)
 				kingCellPos = {i, j};
 		}
@@ -189,6 +192,8 @@ void Game::computePosition() {
 						}
 						if (kingCellPos.x == x && kingCellPos.y == y)
 							kingXrayers.insert(&path);
+							// kingXrayers.emplace(olc::vi2d{path.firstTarget.x, path.firstTarget.y}, &path);
+							// kingXrayers[path.firstTarget.x][path.firstTarget.y] = &path;
 					}
 					path.line.emplace_back(path.numTargets, olc::vi2d{x, y});
 					return path.numTargets >= 3;
@@ -289,9 +294,11 @@ void Game::computePosition() {
 
 	
 	auto getMoves = [&](int i, int j) -> uint64_t {
-		if (isBlockingCheck(i, j))
-			return 0ULL;
-		return (this->*(pieceMoves[cellType(board[i][j]) - King]))(i, j);
+		uint64_t moves = (this->*(pieceMoves[cellType(board[i][j]) - King]))(i, j);
+		// Path* attackerPath = isBlockingCheck(i, j);
+		// if (attackerPath) {
+		// }
+		return moves;
 	};
 	// FIXME: test and catch all edge cases (there will be many)
 	// player legal moves
@@ -415,16 +422,23 @@ void Game::performMove(olc::vi2d fr, olc::vi2d to) {
 }
 
 // if a piece is blocking their king, they should not move
-bool Game::isBlockingCheck(int i, int j) const {
+// returns attack path if found, otherwise null
+Path* Game::isBlockingCheck(int i, int j) const {
+	// Path* xray = kingXrayers[i][j];
+	// return xray;
+
+	// auto xray = kingXrayers.find(olc::vi2d{i, j});
+	// return xray != kingXrayers.end() ? xray->second : nullptr;
+
 	for (Path* path : kingXrayers) {
 		// if piece is on path between king and source
 		if (path->firstTarget.x == i && path->firstTarget.y == j &&
 			path->secondTarget.x == kingCellPos.x && path->secondTarget.y == kingCellPos.y)
-			return true;
+			return path;
 		// FIXME: the nasty en passant double reveal
 	}
 
-	return false;
+	return nullptr;
 }
 
 // returns true if sliding path should end
@@ -459,15 +473,44 @@ bool Game::setMove(uint64_t& moves, int i, int j, int x, int y) const {
 			}
 		}
 	}
+	else {
+		// auto xrayIter = kingXrayers.find(olc::vi2d{i, j});
+		// Path* attackingPath = xrayIter->second;
+		// Path* attackingPath = kingXrayers[i][j];
+		Path* attackingPath = isBlockingCheck(i, j);
+		if (attackingPath) {
+			allowed = false;
+			const olc::vi2d& attackerPos = attackingPath->source;
+			// capture attacker
+			if (attackerPos.x == x && attackerPos.y == y) {
+				// no work for en passant
+				allowed = true;
+			}
+
+			// if move is on path between king and source
+			for (const auto& [numTargets, cellPos] : attackingPath->line) {
+				if (numTargets > 0)
+					break;
+				if (cellPos.x == x && cellPos.y == y) {
+					allowed = true;
+					break;
+				}
+			}
+		}
+	}
 
 	if (target == Empty) {
-		if (allowed)
+		if (allowed) {
 			boardSetBit(moves, x, y);
+			allLegalMoves[numLegalMoves++] = {{i, j}, {x, y}};
+		}
 		return false;
 	}
 	if (cellColor(target) != cellColor(board[i][j]))
-		if (allowed)
+		if (allowed) {
 			boardSetBit(moves, x, y);
+			allLegalMoves[numLegalMoves++] = {{i, j}, {x, y}};
+		}
 	return true;
 }
 

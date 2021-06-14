@@ -5,6 +5,7 @@
 #include "olcPixelGameEngine.h"
 #include <array>
 #include <unordered_set>
+#include <map>
 
 enum Cell : uint8_t {
 	// 'abstract' cells
@@ -59,7 +60,9 @@ private:
 	std::array<std::array<uint64_t, 8>, 8> legalMoves; // player
 
 	std::array<std::array<std::vector<Path*>, 8>, 8> attackers; // opponents
-	std::unordered_set<Path*> kingXrayers;
+	std::unordered_set<Path*> kingXrayers; // first target, path
+	// std::map<olc::vi2d, Path*> kingXrayers; // first target, path
+	// std::array<std::array<Path*, 8>, 8> kingXrayers;
 	std::array<std::array<std::vector<Path>, 8>, 8> attackingPaths; // opponent
 
 	olc::vi2d kingCellPos;
@@ -86,7 +89,7 @@ private:
 	void fromFEN(const std::string& sequence);
 	void computePosition();
 	bool setMove(uint64_t& moves, int i, int j, int x, int y) const;
-	bool isBlockingCheck(int i, int j) const;
+	Path* isBlockingCheck(int i, int j) const;
 	uint64_t kingMoves(int i, int j) const;
 	uint64_t queenMoves(int i, int j) const;
 	uint64_t bishopMoves(int i, int j) const;
@@ -111,14 +114,11 @@ public:
 	Cell getCell(olc::vi2d pos) const { return getCell(pos.x, pos.y); }
 	Cell getPlayerToMove() const { return playerToMove; }
 
-	Game() {
-		fromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); // starting
-		// test
-		// fromFEN("r1b1k1nr/p2p1pNp/n2B4/1p1NP2P/6P1/3P1Q2/P1P1K3/q5b1");
-		// fromFEN("4k2r/6r1/8/8/8/8/3R4/R3K3 w Qk - 0 1"); // castle
-		// fromFEN("rnbqkbnr/pppp1ppp/8/8/3pP3/6PP/PPPP1P11/RNBQKBNR b KQkq e3 0 3"); // en passant
-		// fromFEN("8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8 b - - 99 50"); // draw
-		
+	mutable std::array<std::pair<olc::vi2d, olc::vi2d>, 256> allLegalMoves;
+	mutable int numLegalMoves = 0;
+
+	Game(const std::string& startingPosition = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+		fromFEN(startingPosition);
 		computePosition();
 	}
 };
